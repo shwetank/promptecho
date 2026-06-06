@@ -42,7 +42,7 @@ You can — at the HTTP layer, vcrpy works on LLM calls today. tapedeck exists b
 ## Install
 
 ```bash
-pip install tapedeck   # not yet published — this is a design sketch
+pip install tapedeck   # not yet on PyPI — install from source for now
 ```
 
 Provider-agnostic: works with any client built on `httpx` (Anthropic, OpenAI, and most others), because interception happens at the HTTP transport layer, not in the SDK.
@@ -121,13 +121,20 @@ Streamed responses store the ordered SSE events under `response.events` with `st
 
 ---
 
+## Status
+
+Working core, v0.1.0. Records and replays real httpx traffic (sync + async),
+including SSE streaming, verified end-to-end by replaying with the upstream
+server shut down (`tests/test_record_replay.py`). Not yet published to PyPI.
+
 ## Roadmap (build-in-public)
 
 - [x] Design: matching, cassette format, record modes
-- [ ] httpx sync transport interception
-- [ ] SSE streaming record/replay
-- [ ] pytest plugin + auto-naming
-- [ ] async client support
+- [x] httpx sync + async transport interception
+- [x] SSE streaming record/replay
+- [x] pytest plugin + auto-naming
+- [ ] per-provider request normalizers (Anthropic vs OpenAI request shapes)
+- [ ] field-level diff on cassette miss in CI
 - [ ] `tapedeck lint` — find un-recorded calls in a test suite
 - [ ] **`toMatchLLMSnapshot()` sibling** — semantic snapshot assertions on top of recorded calls
 

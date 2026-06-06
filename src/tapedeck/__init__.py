@@ -14,23 +14,28 @@ from .cassette import Cassette
 from .transport import Mode
 
 __all__ = ["use_cassette", "Mode", "Cassette"]
-__version__ = "0.0.0"
+__version__ = "0.1.0"
 
 
 @contextmanager
 def _activate(cassette: Cassette, mode: Mode):
-    """Install the tapedeck httpx transport for the duration of the block.
+    """Patch httpx for the duration of the block, then restore and flush.
 
-    Sketch: this is where we patch httpx so every client routes through
-    TapedeckTransport (see transport.py / DESIGN.md §1), then restore on exit
-    and flush the cassette to disk.
+    While active, every httpx-based client (Anthropic, OpenAI, raw httpx) routes
+    through the record/replay decision (see patch.py / DESIGN.md §1).
     """
-    # TODO: patch httpx transport here.
+    from .patch import install, uninstall
+
+    if mode is Mode.ALL:
+        cassette.interactions.clear()  # re-record from scratch
+        cassette._dirty = True
+
+    saved = install(cassette, mode)
     try:
         yield cassette
     finally:
+        uninstall(saved)
         cassette.save()
-        # TODO: restore original httpx transport.
 
 
 class _UseCassette:

@@ -13,7 +13,7 @@ be a maintenance treadmill as SDKs change.
 `use_cassette` activates a patch that swaps the real `httpx` transport for `TapedeckTransport`,
 which sits in front of the real one and decides — per request — whether to **replay** a recorded
 response or **pass through and record**. This is the same mechanism `respx` and `vcrpy`'s httpx
-stub use. Async support is the same idea against `httpx.AsyncBaseTransport` (roadmap).
+stub use. Async (`handle_async_request`) is implemented with the same logic.
 
 The decision logic lives in [`transport.py`](src/tapedeck/transport.py); it's pure and unit-testable
 in isolation from the patching mechanics.

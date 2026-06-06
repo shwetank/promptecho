@@ -70,31 +70,6 @@ def _miss_message(cassette: Cassette, body: dict) -> str:
     return f"No matching recording in {cassette.path!r} (mode=none).{hint}"
 
 
-# ---------------------------------------------------------------------------
-# httpx wiring (sketch — see DESIGN.md §1)
-# ---------------------------------------------------------------------------
-# import httpx
-#
-# class TapedeckTransport(httpx.BaseTransport):
-#     def __init__(self, real: httpx.BaseTransport, cassette: Cassette, mode: Mode):
-#         self._real, self._cassette, self._mode = real, cassette, mode
-#
-#     def handle_request(self, request: httpx.Request) -> httpx.Response:
-#         body = parse_body(request.content)
-#         decision = decide(self._mode, self._cassette, body)
-#
-#         if decision.response is not None:               # REPLAY
-#             return _to_httpx_response(decision.response)
-#
-#         real = self._real.handle_request(request)       # PASS THROUGH
-#         # TODO: buffer the response so we can both record it and return it.
-#         #   - non-stream: read content, record JSON, return a fresh Response
-#         #   - stream:     tee the SSE iterator, record each event, re-emit
-#         recorded = _capture(real)                       # RECORD
-#         self._cassette.record(request.method, str(request.url), body, recorded)
-#         return real
-#
-# def _to_httpx_response(resp: Response) -> "httpx.Response": ...   # incl. SSE re-emit
-# def _capture(real: "httpx.Response") -> Response: ...             # incl. SSE tee
-#
-# Async is the same logic against httpx.AsyncBaseTransport (roadmap).
+# The httpx wiring that turns these decisions into real interception lives in
+# patch.py (sync + async). This module stays pure so the branch logic above is
+# unit-testable without a network stack.

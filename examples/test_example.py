@@ -1,14 +1,21 @@
-"""What using tapedeck feels like. The cassette next door was 'recorded' once;
-this test replays it with no network and no tokens.
+"""What using tapedeck feels like with a real SDK. The cassette next door was
+recorded once; this replays it with no network and no tokens.
+
+Runs only if the `anthropic` package is installed (`pip install tapedeck[dev]`);
+skipped otherwise. The cassette matches on model+messages, so no API key is
+needed and no request leaves the machine.
 """
 
+import pytest
+
 import tapedeck
-from anthropic import Anthropic
+
+anthropic = pytest.importorskip("anthropic")
 
 
 @tapedeck.use_cassette("examples/cassettes/example.yaml", mode="none")
 def test_summarize_replays_from_cassette():
-    client = Anthropic()  # api key not needed: the call never leaves the machine
+    client = anthropic.Anthropic(api_key="not-needed-for-replay")
     msg = client.messages.create(
         model="claude-opus-4-8",
         max_tokens=100,

@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tapedeck"
-version = "0.0.0"
+version = "0.1.0"
 description = "Record & replay for LLM API calls — like vcrpy/nock, built for LLM traffic."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = "MIT"
 keywords = ["llm", "testing", "vcr", "record-replay", "pytest", "anthropic", "openai", "mock"]
 dependencies = [
@@ -23,3 +23,7 @@ tapedeck = "tapedeck.pytest_plugin"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tapedeck"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
