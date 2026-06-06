@@ -56,7 +56,7 @@ tapedeck intercepts at the `httpx` transport layer. **If the SDK uses httpx, tap
 | **Multimodal** — base64-in-JSON (vision, Claude image-out, GPT-4o) and raw binary (`image/*`, `audio/*`) | ✅ (byte-exact round-trip) |
 | Bedrock via boto3, HF `InferenceClient`, in-process `transformers` | ❌ (see workarounds in [SUPPORT.md](SUPPORT.md)) |
 
-Full matrix with caveats and workarounds: [**SUPPORT.md**](SUPPORT.md).
+Full matrix with caveats and workarounds: [**SUPPORT.md**](SUPPORT.md). For practical recipes by scenario (startup / enterprise / research), see [**TUTORIAL.md**](TUTORIAL.md).
 
 ### Hosted open-source via the OpenAI SDK
 
