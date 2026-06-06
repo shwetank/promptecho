@@ -28,12 +28,13 @@ Every run after: replayed from disk. No network, no tokens, no flake.
 
 ## Why not just use vcrpy?
 
-You can — at the HTTP layer, vcrpy works on LLM calls today. promptecho exists because LLM traffic breaks vcrpy's assumptions in four specific ways:
+You can — at the HTTP layer, vcrpy works on LLM calls today. promptecho exists because LLM traffic breaks vcrpy's assumptions in five specific ways:
 
 1. **Matching.** vcrpy matches on raw request bytes. LLM bodies carry volatile fields (client-injected IDs, reordered tools, whitespace) that change the bytes without changing the *meaning* — so byte-matching misses on replay. promptecho matches on a **normalized fingerprint** of the fields that determine the response, and **canonicalizes across providers**: it knows `content: "hi"` equals `content: [{"type":"text","text":"hi"}]`, an Anthropic top-level `system` equals an OpenAI `system`-role message, and an Anthropic `input_schema` tool def equals an OpenAI `function.parameters`. A raw-bytes VCR can't.
 2. **Streaming.** Most LLM calls are SSE streams. promptecho records the event stream and faithfully re-emits it on replay, so `stream=True` and token-by-token iteration work identically against a cassette — including reasoning deltas.
 3. **Binary / multimodal responses.** vcrpy's text-based cassettes silently corrupt raw `image/*` / `audio/*` / `octet-stream` bodies. promptecho detects them by `Content-Type` and base64-encodes them in the cassette, so image-out and audio-out responses round-trip byte-exact.
-4. **Secrets.** API keys live in headers on every call. promptecho redacts them by default — a cassette is safe to commit.
+4. **Debuggable CI failures.** When a vcrpy cassette miss happens, you get *"no match"*. promptecho prints the exact path that changed: `messages[1].content: recorded "summarize the cat" / incoming "summarize the dog"`. Test failures are actionable, not detective work.
+5. **Secrets.** API keys live in headers on every call. promptecho redacts them by default — a cassette is safe to commit.
 
 ## What promptecho is *not*
 
@@ -200,9 +201,9 @@ Done:
 - [x] Per-provider request normalizers (Anthropic / OpenAI / generic)
 - [x] Reasoning-model match defaults (`reasoning_effort`, `thinking`, `reasoning`)
 - [x] Binary response round-trip (image/audio/octet-stream — base64 in cassette)
+- [x] Field-level diff on cassette miss (CI `mode=none` errors pinpoint the changed path, not just the field name)
 
 Next:
-- [ ] Field-level diff on cassette miss in CI (`mode=none`)
 - [ ] `requests` / `urllib3` interception backend — unlocks boto3-Bedrock and HF `InferenceClient`
 - [ ] `promptecho lint` — find un-recorded calls in a test suite
 - [ ] **`toMatchLLMSnapshot()` sibling** — semantic snapshot assertions on top of recorded calls

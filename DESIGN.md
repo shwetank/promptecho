@@ -172,11 +172,13 @@ reasonable addition.
 
 ## Open design threads (good build-in-public material)
 
-- **Field-level diff on cassette miss in CI.** On a `mode=none` miss, show the
-  field-level difference between the incoming request and the nearest recorded
-  one — "you changed `messages[1].content`" — so the failure is actionable rather
-  than "no match." Already scaffolded by `diff_fields()` in `matcher.py`; needs
-  better surfacing through the patch layer.
+- ~~**Field-level diff on cassette miss in CI.**~~ **Done** —
+  `matcher.diff_request()` walks both bodies in parallel and emits leaf-level
+  `(path, recorded, incoming)` triples (`messages[1].content`, etc.), shown
+  inline in the `CassetteMiss` error. Restricted to `match_on` fields so the
+  output isn't drowned in volatile-field noise. Long values are truncated to
+  ~80 chars. Open extension: an optional terminal-colored mode for local dev
+  (off by default to keep CI logs grep-able).
 - **Drift detection.** An optional `mode=all` run in a nightly (not PR) CI job
   that re-records and flags when a model's output to a frozen prompt has changed
   — turning cassettes into a cheap model-regression tripwire. The hardest part

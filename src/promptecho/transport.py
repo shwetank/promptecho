@@ -11,7 +11,7 @@ import json
 from enum import Enum
 
 from .cassette import Cassette, Response
-from .matcher import diff_fields, fingerprint
+from .matcher import diff_request, fingerprint
 
 
 class Mode(str, Enum):
@@ -64,10 +64,24 @@ def decide(mode: Mode, cassette: Cassette, body: dict) -> Decision:
 def _miss_message(cassette: Cassette, body: dict) -> str:
     nearest = cassette.interactions[-1] if cassette.interactions else None
     if nearest is None:
-        return f"No recording in {cassette.path!r} and mode=none. Re-record with mode='once'."
-    changed = diff_fields(body, nearest.body, cassette.match_on)
-    hint = f" Nearest recording differs on: {changed}." if changed else ""
-    return f"No matching recording in {cassette.path!r} (mode=none).{hint}"
+        return (
+            f"Cassette miss: {cassette.path!r} has no recordings and mode=none.\n"
+            f"Re-record with mode='once' (or delete and re-run the test)."
+        )
+    diff = diff_request(body, nearest.body, cassette.match_on)
+    if not diff:
+        return (
+            f"Cassette miss in {cassette.path!r} (mode=none): a matched field has a "
+            f"non-equal value the diff walker couldn't pinpoint. Re-record to refresh."
+        )
+    return (
+        f"Cassette miss in {cassette.path!r} (mode=none).\n"
+        f"The incoming request differs from the nearest recording on these fields:\n\n"
+        f"{diff}\n\n"
+        f"If the change is intentional, re-record with mode='once' (or delete the "
+        f"cassette and re-run). If not, fix the call so it matches the recorded "
+        f"fingerprint."
+    )
 
 
 # The httpx wiring that turns these decisions into real interception lives in

@@ -380,23 +380,35 @@ Then: `PROMPTECHO_MODE=all pytest tests/test_thing.py` re-records that file.
 
 ### Debugging a cassette miss
 
-You changed something tiny and now `mode="none"` fails with "no matching
-recording." How to figure out what changed:
+You changed something tiny and `mode="none"` failed. The error message points
+you straight at what's different:
 
-1. **Temporarily switch to `mode="once"`** (or delete the cassette) and re-run
-   the test. You get a new recording.
-2. **Diff the new cassette against the old one** in git. The `body:` block under
-   `request:` is the canonical request shape — whatever's different there is
-   what changed the fingerprint.
-3. **If the change was intentional** (you genuinely changed the prompt), commit
-   the new cassette.
-4. **If the change was unintentional** (you accidentally changed
-   `temperature`, or your conftest is leaking a different `max_tokens`), fix
-   the code so the request matches the old fingerprint, then revert the
-   cassette.
+```
+promptecho.transport.CassetteMiss: Cassette miss in 'cassettes/test_summarize.yaml' (mode=none).
+The incoming request differs from the nearest recording on these fields:
 
-A future "field-level diff on miss" feature will print exactly what changed
-without this dance. For now, `git diff` on the cassettes is the tool.
+  messages[0].content:
+    recorded: summarize: the cat sat on the mat
+    incoming: summarize: the dog sat on the mat
+
+If the change is intentional, re-record with mode='once' (or delete the
+cassette and re-run). If not, fix the call so it matches the recorded
+fingerprint.
+```
+
+That's the entire workflow:
+
+- **Intentional change** (you genuinely updated the prompt) → delete the
+  cassette (or set `mode="once"` for one run) and re-record. The new cassette
+  is committed in the same PR.
+- **Unintentional change** (a conftest started leaking a different `max_tokens`,
+  or a stray `temperature` slipped in) → the path in the error tells you the
+  field; fix the code so it matches the recorded fingerprint, no re-record
+  needed.
+
+Only fields in `match_on` are surfaced — volatile fields outside the match set
+can't have caused the miss, so they're intentionally hidden from the diff
+(otherwise every miss would be noisy with timestamp / request-ID changes).
 
 ### Tuning `match_on` for your test
 
