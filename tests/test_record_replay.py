@@ -1,4 +1,4 @@
-"""End-to-end proof that tapedeck records and replays real httpx traffic.
+"""End-to-end proof that tapelog records and replays real httpx traffic.
 
 A local HTTP server stands in for an LLM API. We record against it, shut it
 down, then replay — if replay still works with the server dead, the response
@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import httpx
 import pytest
 
-import tapedeck
+import tapelog
 
 # how many times the upstream server was actually hit
 HITS = {"n": 0}
@@ -63,7 +63,7 @@ def test_json_record_then_replay_with_server_down(server, tmp_path):
             "messages": [{"role": "user", "content": "Summarize: the cat sat on the mat."}]}
 
     # RECORD: one real call.
-    with tapedeck.use_cassette(cassette, mode="once"):
+    with tapelog.use_cassette(cassette, mode="once"):
         r = httpx.Client().post(f"{base}/json", json=body)
     assert r.json()["content"][0]["text"] == "A cat sat on a mat."
     assert HITS["n"] == 1
@@ -72,7 +72,7 @@ def test_json_record_then_replay_with_server_down(server, tmp_path):
     srv.shutdown()
 
     # REPLAY: same response, zero new hits, server dead.
-    with tapedeck.use_cassette(cassette, mode="none"):
+    with tapelog.use_cassette(cassette, mode="none"):
         r2 = httpx.Client().post(f"{base}/json", json=body)
     assert r2.json()["content"][0]["text"] == "A cat sat on a mat."
     assert HITS["n"] == 1  # no additional upstream call
@@ -88,14 +88,14 @@ def test_streaming_record_then_replay(server, tmp_path):
             return [json.loads(line[6:])["text"]
                     for line in resp.iter_lines() if line.startswith("data: ")]
 
-    with tapedeck.use_cassette(cassette, mode="once"):
+    with tapelog.use_cassette(cassette, mode="once"):
         recorded = collect()
     assert recorded == ["Hello", " world", "!"]
     assert HITS["n"] == 1
 
     srv.shutdown()
 
-    with tapedeck.use_cassette(cassette, mode="none"):
+    with tapelog.use_cassette(cassette, mode="none"):
         replayed = collect()
     assert replayed == ["Hello", " world", "!"]
     assert HITS["n"] == 1  # streamed purely from the cassette
@@ -111,13 +111,13 @@ def test_async_record_then_replay(server, tmp_path):
             r = await c.post(f"{base}/json", json=body)
             return r.json()["content"][0]["text"]
 
-    with tapedeck.use_cassette(cassette, mode="once"):
+    with tapelog.use_cassette(cassette, mode="once"):
         assert asyncio.run(call()) == "A cat sat on a mat."
     assert HITS["n"] == 1
 
     srv.shutdown()
 
-    with tapedeck.use_cassette(cassette, mode="none"):
+    with tapelog.use_cassette(cassette, mode="none"):
         assert asyncio.run(call()) == "A cat sat on a mat."
     assert HITS["n"] == 1  # replayed from cassette, async client, server dead
 
@@ -132,13 +132,13 @@ def test_cross_shape_replay(server, tmp_path):
                    "messages": [{"role": "system", "content": "be terse"},
                                 {"role": "user", "content": "hi"}]}
 
-    with tapedeck.use_cassette(cassette, mode="once"):
+    with tapelog.use_cassette(cassette, mode="once"):
         httpx.Client().post(f"{base}/json", json=anthropic_body)
     assert HITS["n"] == 1
 
     srv.shutdown()  # replay must not touch the network
 
-    with tapedeck.use_cassette(cassette, mode="none"):
+    with tapelog.use_cassette(cassette, mode="none"):
         r = httpx.Client().post(f"{base}/json", json=openai_body)
     assert r.json()["content"][0]["text"] == "A cat sat on a mat."
     assert HITS["n"] == 1  # matched the Anthropic recording despite different shape
@@ -147,10 +147,10 @@ def test_cross_shape_replay(server, tmp_path):
 def test_mode_none_miss_raises(server, tmp_path):
     _, base = server
     cassette = str(tmp_path / "empty.yaml")
-    from tapedeck.transport import CassetteMiss
+    from tapelog.transport import CassetteMiss
 
     with pytest.raises(CassetteMiss):
-        with tapedeck.use_cassette(cassette, mode="none"):
+        with tapelog.use_cassette(cassette, mode="none"):
             httpx.Client().post(f"{base}/json", json={"model": "x", "messages": []})
     assert HITS["n"] == 0  # never went to network
 
@@ -160,14 +160,14 @@ def test_fingerprint_ignores_volatile_fields(server, tmp_path):
     srv, base = server
     cassette = str(tmp_path / "fp.yaml")
 
-    with tapedeck.use_cassette(cassette, mode="once"):
+    with tapelog.use_cassette(cassette, mode="once"):
         httpx.Client().post(f"{base}/json",
                             json={"model": "m", "messages": [{"role": "user", "content": "x"}]})
     assert HITS["n"] == 1
     srv.shutdown()
 
     # different key order + an extra field not in match_on -> same fingerprint -> replay
-    with tapedeck.use_cassette(cassette, mode="none"):
+    with tapelog.use_cassette(cassette, mode="none"):
         r = httpx.Client().post(
             f"{base}/json",
             json={"messages": [{"role": "user", "content": "x"}], "model": "m",

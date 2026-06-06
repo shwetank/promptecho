@@ -1,8 +1,8 @@
-"""tapedeck — record & replay for LLM API calls.
+"""tapelog — record & replay for LLM API calls.
 
 Public API:
-    tapedeck.use_cassette(path, mode="once", match_on=None)   # decorator + context manager
-    tapedeck.Mode                                             # record modes
+    tapelog.use_cassette(path, mode="once", match_on=None)   # decorator + context manager
+    tapelog.Mode                                             # record modes
 """
 
 from __future__ import annotations
@@ -70,12 +70,12 @@ def use_cassette(path: str, mode: str | Mode = Mode.ONCE, match_on=None) -> _Use
 
     Usage as a decorator::
 
-        @tapedeck.use_cassette("cassettes/foo.yaml")
+        @tapelog.use_cassette("cassettes/foo.yaml")
         def test_foo(): ...
 
     or as a context manager::
 
-        with tapedeck.use_cassette("cassettes/foo.yaml", mode="none"):
+        with tapelog.use_cassette("cassettes/foo.yaml", mode="none"):
             client.messages.create(...)
     """
     return _UseCassette(path, mode=mode, match_on=match_on)

@@ -1,6 +1,6 @@
 """pytest integration: an auto-named cassette per test.
 
-    def test_summarize(tapedeck_cassette):   # -> cassettes/test_summarize.yaml
+    def test_summarize(tapelog_cassette):   # -> cassettes/test_summarize.yaml
         client.messages.create(...)
 
 Mode defaults to ``once`` locally and ``none`` in CI (when the CI env var is set),
@@ -22,7 +22,7 @@ def _default_mode() -> Mode:
 
 
 @pytest.fixture
-def tapedeck_cassette(request):
+def tapelog_cassette(request):
     cassette_dir = os.path.join(os.path.dirname(request.fspath), "cassettes")
     path = os.path.join(cassette_dir, f"{request.node.name}.yaml")
     with use_cassette(path, mode=_default_mode()) as cassette:

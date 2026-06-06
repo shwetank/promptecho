@@ -1,13 +1,13 @@
 # Support matrix
 
-What tapedeck does and doesn't capture today. **This file is the source of truth.**
+What tapelog does and doesn't capture today. **This file is the source of truth.**
 A row marked ✅ is exercised by a test in `tests/`; ❌ is a known limit with the
 workaround (if any) inline.
 
-**One rule explains everything below:** tapedeck intercepts at the `httpx`
-transport layer. If the client uses httpx, tapedeck sees the call. If it uses
+**One rule explains everything below:** tapelog intercepts at the `httpx`
+transport layer. If the client uses httpx, tapelog sees the call. If it uses
 `requests`, `urllib3`, `aiohttp`, or `grpc`, it doesn't. There is no silent
-degradation — an unsupported transport just goes to the network as if tapedeck
+degradation — an unsupported transport just goes to the network as if tapelog
 weren't installed.
 
 ---

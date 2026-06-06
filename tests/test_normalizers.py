@@ -3,8 +3,8 @@ when their wire representation differs. This is the capability a raw-bytes HTTP
 VCR cannot have.
 """
 
-from tapedeck.matcher import fingerprint
-from tapedeck.normalizers import detect, normalize
+from tapelog.matcher import fingerprint
+from tapelog.normalizers import detect, normalize
 
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"

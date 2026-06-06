@@ -2,7 +2,7 @@
 
 We monkeypatch ``httpx.HTTPTransport.handle_request`` (and the async twin) so
 every client built on httpx — Anthropic, OpenAI, raw httpx — routes through the
-record/replay decision in :mod:`tapedeck.transport`. This is the same approach
+record/replay decision in :mod:`tapelog.transport`. This is the same approach
 respx and vcrpy's httpx stub use. See DESIGN.md §1.
 
 On record we read the full upstream response, capture it, and return a fresh
