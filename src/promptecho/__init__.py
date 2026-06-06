@@ -3,6 +3,7 @@
 Public API:
     promptecho.use_cassette(path, mode="once", match_on=None)   # decorator + context manager
     promptecho.Mode                                             # record modes
+    promptecho.CassetteMiss                                     # exception raised in mode='none'
 """
 
 from __future__ import annotations
@@ -11,10 +12,10 @@ import functools
 from contextlib import contextmanager
 
 from .cassette import Cassette
-from .transport import Mode
+from .transport import CassetteMiss, Mode
 
-__all__ = ["use_cassette", "Mode", "Cassette"]
-__version__ = "0.1.0"
+__all__ = ["use_cassette", "Mode", "Cassette", "CassetteMiss"]
+__version__ = "0.1.1"
 
 
 @contextmanager

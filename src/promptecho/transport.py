@@ -21,8 +21,21 @@ class Mode(str, Enum):
     ALL = "all"             # always re-record
 
 
-class CassetteMiss(Exception):
-    """Raised in mode=none when an incoming request has no recording."""
+class CassetteMiss(BaseException):
+    """Raised in mode=none when an incoming request has no recording.
+
+    Inherits from ``BaseException`` (not ``Exception``) on purpose. LLM SDKs
+    routinely wrap any caught ``Exception`` from their transport layer into
+    their own connection-error type — e.g. the OpenAI SDK turns it into
+    ``openai.APIConnectionError("Connection error.")``, hiding the real
+    field-level diff at the top of pytest's failure summary. Bypassing
+    ``except Exception:`` blocks (the same trick ``pytest.fail`` uses for its
+    internal ``Failed`` exception) ensures the diagnostic message reaches the
+    test runner unmangled.
+
+    If you legitimately need to catch it in a test, use ``except CassetteMiss:``
+    or ``pytest.raises(CassetteMiss)`` — both still work.
+    """
 
 
 def parse_body(raw: bytes) -> dict:

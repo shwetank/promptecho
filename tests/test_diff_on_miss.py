@@ -110,6 +110,37 @@ def server():
     srv.shutdown()
 
 
+def test_cassette_miss_escapes_except_exception(server, tmp_path):
+    """The OpenAI / Anthropic / Mistral SDKs all do ``except Exception: raise
+    APIConnectionError(...)`` inside their transport. If CassetteMiss inherits
+    from Exception, the SDK swallows it and the diff message is hidden at the
+    top of pytest's failure summary. Inheriting from BaseException (as
+    pytest.fail's Failed does) bypasses this.
+    """
+    _, base = server
+    cassette = str(tmp_path / "empty.yaml")
+
+    sdk_wrapper_swallowed = False
+    try:
+        with promptecho.use_cassette(cassette, mode="none"):
+            try:
+                httpx.Client().post(f"{base}/x", json={"model": "m", "messages": []})
+            except Exception:  # the SDK pattern — must NOT catch CassetteMiss
+                sdk_wrapper_swallowed = True
+    except CassetteMiss:
+        pass  # correct path — bypassed the SDK's `except Exception:`
+
+    assert not sdk_wrapper_swallowed, (
+        "CassetteMiss was caught by `except Exception:` — SDKs will wrap it and "
+        "hide the field-level diff. Make sure it inherits from BaseException."
+    )
+
+
+def test_cassette_miss_is_exported_at_top_level():
+    """Users shouldn't have to drill into promptecho.transport."""
+    assert promptecho.CassetteMiss is CassetteMiss
+
+
 def test_real_miss_error_pinpoints_changed_field(server, tmp_path):
     """Record one prompt; then send a slightly-changed one; the error must point at it."""
     srv, base = server

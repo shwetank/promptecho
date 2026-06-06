@@ -179,6 +179,17 @@ reasonable addition.
   output isn't drowned in volatile-field noise. Long values are truncated to
   ~80 chars. Open extension: an optional terminal-colored mode for local dev
   (off by default to keep CI logs grep-able).
+- ~~**`CassetteMiss` swallowed by SDK transport wrappers.**~~ **Done in v0.1.1** —
+  the OpenAI / Anthropic / Mistral SDKs wrap any caught ``Exception`` from
+  their transport layer into their own connection-error type (e.g.
+  ``openai.APIConnectionError("Connection error.")``), which hides the
+  diff message at the top of pytest's failure summary. We now inherit
+  `CassetteMiss` from `BaseException` (the same trick `pytest.fail`'s
+  internal `Failed` uses), so SDKs' `except Exception:` blocks don't see it
+  and the diagnostic message reaches the test runner intact. Tradeoff
+  acknowledged: user code that does `except Exception:` around a
+  `use_cassette` block won't catch the miss either — but that's the right
+  behavior, since a test-fixture failure should never be silently swallowed.
 - **Drift detection.** An optional `mode=all` run in a nightly (not PR) CI job
   that re-records and flags when a model's output to a frozen prompt has changed
   — turning cassettes into a cheap model-regression tripwire. The hardest part
