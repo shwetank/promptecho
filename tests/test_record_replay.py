@@ -122,6 +122,28 @@ def test_async_record_then_replay(server, tmp_path):
     assert HITS["n"] == 1  # replayed from cassette, async client, server dead
 
 
+def test_cross_shape_replay(server, tmp_path):
+    """Record an Anthropic-shaped call; replay its OpenAI-shaped equivalent."""
+    srv, base = server
+    cassette = str(tmp_path / "cross.yaml")
+    anthropic_body = {"model": "shared", "system": "be terse",
+                      "messages": [{"role": "user", "content": "hi"}]}
+    openai_body = {"model": "shared",
+                   "messages": [{"role": "system", "content": "be terse"},
+                                {"role": "user", "content": "hi"}]}
+
+    with tapedeck.use_cassette(cassette, mode="once"):
+        httpx.Client().post(f"{base}/json", json=anthropic_body)
+    assert HITS["n"] == 1
+
+    srv.shutdown()  # replay must not touch the network
+
+    with tapedeck.use_cassette(cassette, mode="none"):
+        r = httpx.Client().post(f"{base}/json", json=openai_body)
+    assert r.json()["content"][0]["text"] == "A cat sat on a mat."
+    assert HITS["n"] == 1  # matched the Anthropic recording despite different shape
+
+
 def test_mode_none_miss_raises(server, tmp_path):
     _, base = server
     cassette = str(tmp_path / "empty.yaml")

@@ -17,6 +17,7 @@ import json
 import httpx
 
 from .cassette import Response as Rec
+from .normalizers import normalize
 from .transport import decide, parse_body
 
 # Hop-by-hop / encoding headers that won't match our re-encoded body on replay.
@@ -72,7 +73,7 @@ def _to_httpx(rec: Rec, request: httpx.Request) -> httpx.Response:
 
 def _make_sync(cassette, mode, real_fn):
     def handle_request(self, request: httpx.Request) -> httpx.Response:
-        body = _request_body(request)
+        body = normalize(str(request.url), _request_body(request))
         decision = decide(mode, cassette, body)
         if decision.response is not None:                      # REPLAY (no network)
             return _to_httpx(decision.response, request)
@@ -86,7 +87,7 @@ def _make_sync(cassette, mode, real_fn):
 
 def _make_async(cassette, mode, real_fn):
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        body = _request_body(request)
+        body = normalize(str(request.url), _request_body(request))
         decision = decide(mode, cassette, body)
         if decision.response is not None:
             return _to_httpx(decision.response, request)

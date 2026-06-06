@@ -28,7 +28,7 @@ Every run after: replayed from disk. No network, no tokens, no flake.
 
 You can — at the HTTP layer, vcrpy works on LLM calls today. tapedeck exists because LLM traffic breaks vcrpy's assumptions in three specific ways:
 
-1. **Matching.** vcrpy matches on raw request bytes. LLM request bodies carry volatile fields (client-injected IDs, reordered tool lists, whitespace differences) that change the bytes without changing the *meaning* of the request — so byte-matching misses on replay. tapedeck matches on a **normalized fingerprint** of the fields that actually determine the response.
+1. **Matching.** vcrpy matches on raw request bytes. LLM bodies carry volatile fields (client-injected IDs, reordered tools, whitespace) that change the bytes without changing the *meaning* — so byte-matching misses on replay. tapedeck matches on a **normalized fingerprint** of the fields that determine the response, and **canonicalizes across providers**: it knows `content: "hi"` equals `content: [{"type":"text","text":"hi"}]`, and that an Anthropic top-level `system` equals an OpenAI `system`-role message. A raw-bytes VCR can't.
 2. **Streaming.** Most LLM calls are SSE streams. tapedeck records the event stream and faithfully re-emits it on replay, so `stream=True` and token-by-token iteration work identically against a cassette.
 3. **Secrets.** API keys live in headers on every call. tapedeck redacts them by default — a cassette is safe to commit.
 
@@ -133,7 +133,7 @@ server shut down (`tests/test_record_replay.py`). Not yet published to PyPI.
 - [x] httpx sync + async transport interception
 - [x] SSE streaming record/replay
 - [x] pytest plugin + auto-naming
-- [ ] per-provider request normalizers (Anthropic vs OpenAI request shapes)
+- [x] per-provider request normalizers (Anthropic / OpenAI / generic)
 - [ ] field-level diff on cassette miss in CI
 - [ ] `tapedeck lint` — find un-recorded calls in a test suite
 - [ ] **`toMatchLLMSnapshot()` sibling** — semantic snapshot assertions on top of recorded calls

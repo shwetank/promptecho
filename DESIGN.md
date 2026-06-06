@@ -66,9 +66,12 @@ must be safe by default — opt-out, not opt-in.
 
 ## Open design questions (good build-in-public threads)
 
-- **Match-on defaults per provider.** Should `match_on` auto-adapt to detected provider shape
-  (Anthropic `system` is top-level; OpenAI folds it into `messages`)? Leaning yes, via a pluggable
-  normalizer that maps each provider to a canonical request shape *before* fingerprinting.
+- ~~**Match-on defaults per provider.**~~ **Done** — `normalizers.py` maps each provider to a
+  canonical request shape *before* fingerprinting (Anthropic top-level `system` ≡ OpenAI
+  `system`-role message; string content ≡ single text block; tool-def shapes unified). The
+  canonical body is what gets stored, so cassettes are provider-agnostic and readable. Detection is
+  URL-host first, body-shape fallback. Open extension: more providers (Gemini, Mistral) and a
+  user-pluggable normalizer hook.
 - **Partial-match diagnostics.** On a cassette miss in `mode=none`, show a field-level diff between
   the incoming request and the nearest recorded one — "you changed `messages[1].content`" — so the
   failure is actionable, not just "no match."
