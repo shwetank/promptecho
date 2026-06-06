@@ -1,4 +1,4 @@
-# tapelog — design notes
+# promptecho — design notes
 
 The ergonomics — `use_cassette` decorator, record modes, pytest fixture — are
 table stakes copied straight from vcrpy and aren't interesting. The six sections
@@ -15,21 +15,21 @@ layer and get every one of them for free, instead of monkeypatching each SDK's
 `messages.create` / `chat.completions.create` surface (which would be a maintenance
 treadmill as SDKs change).
 
-The mechanism: [`patch.py`](src/tapelog/patch.py) monkeypatches
+The mechanism: [`patch.py`](src/promptecho/patch.py) monkeypatches
 `httpx.HTTPTransport.handle_request` (sync) and `httpx.AsyncHTTPTransport.handle_async_request`
 (async) for the duration of the `use_cassette` block, then restores the originals.
 Each patched method routes the request through the record/replay decision and
 either returns a fresh `httpx.Response` reconstructed from the cassette or passes
 through to the real transport and captures the result.
 
-The decision logic itself lives in [`transport.py`](src/tapelog/transport.py) and
+The decision logic itself lives in [`transport.py`](src/promptecho/transport.py) and
 is pure — no httpx, no I/O. That separation means the branching logic (cassette
 miss → record? error? re-record?) is unit-testable without standing up a network
 stack. It's the same separation `respx` and `vcrpy`'s httpx stub use.
 
 **The cost of this choice:** SDKs not on httpx (boto3-Bedrock, HF `InferenceClient`,
 `google-cloud-aiplatform`) are invisible — they just pass straight to the network as if
-tapelog weren't installed. That's a deliberate v1 scope. The roadmap item
+promptecho weren't installed. That's a deliberate v1 scope. The roadmap item
 "`requests`/`urllib3` interception backend" closes it, at the cost of supporting two
 transport stacks at once.
 
@@ -74,10 +74,10 @@ fields are load-bearing for *their* assertion (does this test care about
 
 **What we deliberately do NOT do:** semantic / embedding matching on replay.
 "Different prompt, embedding-close enough → same recording" reintroduces
-non-determinism into the exact thing you adopted tapelog to make deterministic,
+non-determinism into the exact thing you adopted promptecho to make deterministic,
 and can silently serve the wrong recording. Semantic matching is a *caching*
 concern, not a *testing* one. Keeping these two ideas separate is a core stance
-— see the README's "What tapelog is not." A `fuzzy=True` dev-loop convenience
+— see the README's "What promptecho is not." A `fuzzy=True` dev-loop convenience
 is on the roadmap; it will never be the default and never used in CI.
 
 ## 3. Cross-provider canonicalization
@@ -92,7 +92,7 @@ SDK versions, and even within a single provider's API:
   `{type: function, function: {name, description, parameters}}`.
 - OpenAI's `max_completion_tokens` is an alias of `max_tokens` for newer models.
 
-[`normalizers.py`](src/tapelog/normalizers.py) maps each raw provider body into
+[`normalizers.py`](src/promptecho/normalizers.py) maps each raw provider body into
 one canonical shape *before* fingerprinting. That's the capability a raw-bytes HTTP
 VCR fundamentally cannot have — and the reason "just point vcrpy at httpx" is
 unsatisfying. Provider is detected by URL host first, body-shape fallback (so
@@ -119,7 +119,7 @@ final assembled body is useless for testing streaming code paths — you can't
 test progressive UI rendering, token-budget cutoffs, or streaming-tool-call
 handling against a one-shot fixture.
 
-tapelog captures the **ordered list of SSE events** as they arrive, stores them
+promptecho captures the **ordered list of SSE events** as they arrive, stores them
 under `response.events`, and on replay re-emits them as a synthetic stream — so
 `for chunk in stream:` iterates identically against the cassette, including event
 boundaries and `message_delta` / `content_block_delta` / reasoning-delta ordering.
@@ -160,7 +160,7 @@ fixture.
 A cassette is meant to be committed, so it must be safe by default — opt-out, not
 opt-in. On record we strip `authorization`, `x-api-key`, and `openai-organization`
 headers and never write request auth to disk. The list is configurable
-(`REDACT_HEADERS` in [`cassette.py`](src/tapelog/cassette.py)) — extend it for
+(`REDACT_HEADERS` in [`cassette.py`](src/promptecho/cassette.py)) — extend it for
 provider-specific auth headers, never shrink it without thinking carefully.
 
 Body-level secrets (a prompt that happens to contain a credential) are *not*

@@ -1,6 +1,6 @@
-# tapelog tutorial
+# promptecho tutorial
 
-Practical recipes for using tapelog in real codebases — from a one-engineer
+Practical recipes for using promptecho in real codebases — from a one-engineer
 prototype, to a tight startup, to a 200-engineer enterprise codebase, to a
 research project that needs to be reproducible six months from now.
 
@@ -27,16 +27,16 @@ closest to yours and skim the rest as needed.
 
 Install:
 ```bash
-pip install -e path/to/tapelog   # not yet on PyPI
+pip install -e path/to/promptecho   # not yet on PyPI
 ```
 
 Write a test the way you normally would:
 ```python
 # test_summarize.py
-import tapelog
+import promptecho
 from anthropic import Anthropic
 
-@tapelog.use_cassette("cassettes/summarize.yaml")
+@promptecho.use_cassette("cassettes/summarize.yaml")
 def test_summarize():
     msg = Anthropic().messages.create(
         model="claude-opus-4-8",
@@ -78,7 +78,7 @@ tweak.
 
 ```python
 # Use the auto-named fixture so each test owns its own cassette file.
-def test_extracts_invoice_total(tapelog_cassette):
+def test_extracts_invoice_total(promptecho_cassette):
     # records to cassettes/test_extracts_invoice_total.yaml the first time
     extracted = extract_invoice(SAMPLE_PDF_TEXT)
     assert extracted["total"] == 1247.50
@@ -95,7 +95,7 @@ git commit
 
 Or, for a sweep, set the mode globally for one run:
 ```bash
-TAPELOG_MODE=all pytest tests/test_extract.py   # re-records everything
+PROMPTECHO_MODE=all pytest tests/test_extract.py   # re-records everything
 ```
 (Add this env-var override in your `conftest.py` — it's a 6-line fixture; see
 [example below](#tip-rerecord-env-var).)
@@ -119,7 +119,7 @@ def llm():
         api_key=os.environ["LLM_API_KEY"],
     )
 
-def test_summarize(llm, tapelog_cassette):
+def test_summarize(llm, promptecho_cassette):
     r = llm.chat.completions.create(model=MODEL, messages=[...])
     assert r.choices[0].message.content
 ```
@@ -136,7 +136,7 @@ live API, commit the cassette, demo from replay. Your demo can't flake, can't
 hallucinate live, and runs offline on stage.
 
 ```python
-@tapelog.use_cassette("cassettes/demo_walkthrough.yaml", mode="none")
+@promptecho.use_cassette("cassettes/demo_walkthrough.yaml", mode="none")
 def demo_script():
     # everything here replays from the recording — deterministic
     ...
@@ -158,16 +158,16 @@ an enterprise it can hide a regression that ships to a million users.
 
 ```python
 # conftest.py at repo root
-import os, pytest, tapelog
+import os, pytest, promptecho
 
 @pytest.fixture(autouse=True)
-def _ci_mode_none(tapelog_cassette):
-    """In CI, every test that uses the tapelog fixture must replay, never
+def _ci_mode_none(promptecho_cassette):
+    """In CI, every test that uses the promptecho fixture must replay, never
     record. A cassette miss fails the build instead of making a live call."""
     yield  # fixture already enforces this when CI=true
 ```
 
-The shipped `tapelog_cassette` fixture already defaults to `mode="none"` when
+The shipped `promptecho_cassette` fixture already defaults to `mode="none"` when
 `CI=true` in the environment. The reason to wire it explicitly in your
 `conftest.py` is to make the intent grep-able for a security or platform team
 reviewing why the CI box doesn't have API keys.
@@ -186,7 +186,7 @@ def _no_network_in_ci(monkeypatch):
         monkeypatch.setattr(socket, "socket", blocked)
 ```
 
-This isn't tapelog-specific but pairs with it well: any test that doesn't have
+This isn't promptecho-specific but pairs with it well: any test that doesn't have
 a cassette and tries to actually hit the network gets caught at the socket
 layer.
 
@@ -258,7 +258,7 @@ client = AnthropicBedrock(aws_region="us-east-1")  # uses IAM
 r = client.messages.create(model="anthropic.claude-...", messages=[...])
 ```
 
-Same auth, same model, same backend — but now httpx-based and tapelog sees it.
+Same auth, same model, same backend — but now httpx-based and promptecho sees it.
 
 ---
 
@@ -285,7 +285,7 @@ experiment-2026-claude-vs-gpt/
 
 ```python
 # run.py
-@tapelog.use_cassette(f"cassettes/{CONDITION}.yaml")
+@promptecho.use_cassette(f"cassettes/{CONDITION}.yaml")
 def run_condition(prompts):
     return [model_call(p) for p in prompts]
 ```
@@ -301,14 +301,14 @@ spend:
 ```python
 def record_baselines():
     for provider in ["openai", "anthropic", "openrouter_llama"]:
-        with tapelog.use_cassette(f"cassettes/{provider}.yaml", mode="once"):
+        with promptecho.use_cassette(f"cassettes/{provider}.yaml", mode="once"):
             for prompt in BENCHMARK_PROMPTS:
                 CLIENTS[provider].chat.completions.create(...)
 
 def analyze():
     # zero cost, zero variance, runs offline
     for provider in ["openai", "anthropic", "openrouter_llama"]:
-        with tapelog.use_cassette(f"cassettes/{provider}.yaml", mode="none"):
+        with promptecho.use_cassette(f"cassettes/{provider}.yaml", mode="none"):
             for prompt in BENCHMARK_PROMPTS:
                 response = CLIENTS[provider].chat.completions.create(...)
                 yield score(response)
@@ -321,8 +321,8 @@ twenty times tuning the scorer without paying twenty times.
 
 ```python
 # top of the notebook
-import tapelog
-ctx = tapelog.use_cassette("cassettes/notebook_session.yaml", mode="once")
+import promptecho
+ctx = promptecho.use_cassette("cassettes/notebook_session.yaml", mode="once")
 ctx.__enter__()   # leave open for the rest of the session
 ```
 
@@ -364,19 +364,19 @@ mode without editing decorators:
 
 ```python
 # conftest.py
-import os, pytest, tapelog
+import os, pytest, promptecho
 
 @pytest.fixture
-def tapelog_cassette(request, tmp_path_factory):
+def promptecho_cassette(request, tmp_path_factory):
     cassette_dir = os.path.join(os.path.dirname(request.fspath), "cassettes")
     os.makedirs(cassette_dir, exist_ok=True)
     path = os.path.join(cassette_dir, f"{request.node.name}.yaml")
-    mode = os.environ.get("TAPELOG_MODE", "none" if os.environ.get("CI") else "once")
-    with tapelog.use_cassette(path, mode=mode) as c:
+    mode = os.environ.get("PROMPTECHO_MODE", "none" if os.environ.get("CI") else "once")
+    with promptecho.use_cassette(path, mode=mode) as c:
         yield c
 ```
 
-Then: `TAPELOG_MODE=all pytest tests/test_thing.py` re-records that file.
+Then: `PROMPTECHO_MODE=all pytest tests/test_thing.py` re-records that file.
 
 ### Debugging a cassette miss
 
@@ -433,7 +433,7 @@ def llm(request):
     }[request.param]
     return OpenAI(base_url=base, api_key=os.environ.get(f"{request.param.upper()}_KEY", "x"))
 
-def test_summarize(llm, tapelog_cassette):
+def test_summarize(llm, promptecho_cassette):
     # one cassette per provider, auto-named to include the param
     ...
 ```
@@ -449,14 +449,14 @@ Reasoning models work without special handling. Two specifics worth knowing:
 
 **1. The reasoning knobs are in the default `match_on`,** so this Just Works:
 ```python
-@tapelog.use_cassette("cassettes/o3_high.yaml")
+@promptecho.use_cassette("cassettes/o3_high.yaml")
 def test_o3_high():
     r = OpenAI().chat.completions.create(
         model="o3-mini", reasoning_effort="high",
         messages=[{"role": "user", "content": "solve: 17 * 23"}])
     ...
 
-@tapelog.use_cassette("cassettes/o3_low.yaml")
+@promptecho.use_cassette("cassettes/o3_low.yaml")
 def test_o3_low():
     r = OpenAI().chat.completions.create(
         model="o3-mini", reasoning_effort="low",
@@ -477,11 +477,11 @@ events get captured and re-emitted in order.
 ### Multimodal: images, audio, vision
 
 **Vision / image input.** The image is in the request body (typically base64 in
-a content block). It's just JSON — tapelog records the request normally and
+a content block). It's just JSON — promptecho records the request normally and
 the prompt-with-image becomes part of the fingerprint.
 
 **Image output / Claude image / GPT-4o image.** The image is base64 inside a
-JSON content block in the response. tapelog records the JSON; the base64
+JSON content block in the response. promptecho records the JSON; the base64
 round-trips byte-exact.
 
 **Raw binary responses** (`Content-Type: image/png`, `audio/wav`, etc.). Detected
@@ -499,23 +499,23 @@ What doesn't work:
 
 Things that *look* like they should work but lead to pain:
 
-**Don't put secrets in the prompt body and rely on tapelog to redact them.**
+**Don't put secrets in the prompt body and rely on promptecho to redact them.**
 Only headers are auto-redacted. If you record a prompt that contains real PII
 or a real API key, that data ends up in the committed YAML. Use synthetic data,
 or scrub before commit (see [Compliance and PII](#compliance-and-pii)).
 
 **Don't fuzzy-match in CI.** A future opt-in `fuzzy=True` flag will allow
 semantic-similarity matching during local dev — never use it in CI. It
-reintroduces the exact non-determinism you adopted tapelog to remove.
+reintroduces the exact non-determinism you adopted promptecho to remove.
 
 **Don't share one cassette across many unrelated tests.** Use the
-`tapelog_cassette` fixture or one file per test. Sharing a cassette across
+`promptecho_cassette` fixture or one file per test. Sharing a cassette across
 tests works mechanically (the fingerprints find the right interaction) but
 makes the cassette diff in PR review unreadable.
 
-**Don't intercept and mock LLM responses *in addition to* tapelog.** You'll
-either double-mock (tapelog records the mock, not the real response) or
-fight over the httpx transport. Pick one. tapelog is for the cases where you
+**Don't intercept and mock LLM responses *in addition to* promptecho.** You'll
+either double-mock (promptecho records the mock, not the real response) or
+fight over the httpx transport. Pick one. promptecho is for the cases where you
 want a real recording; conventional mocking is for everything else.
 
 **Don't commit cassettes recorded against an unstable upstream.** If you're
@@ -533,7 +533,7 @@ operation, not a build operation.
 
 - [README](README.md) — the elevator pitch and quickstart
 - [SUPPORT.md](SUPPORT.md) — what's covered, what isn't, with workarounds
-- [DESIGN.md](DESIGN.md) — *why* tapelog makes the choices it does
+- [DESIGN.md](DESIGN.md) — *why* promptecho makes the choices it does
 - `tests/` — the working examples of every claim in this doc
 
 If a scenario you actually live in isn't covered here, file an issue with the

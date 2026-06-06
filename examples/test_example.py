@@ -1,19 +1,19 @@
-"""What using tapelog feels like with a real SDK. The cassette next door was
+"""What using promptecho feels like with a real SDK. The cassette next door was
 recorded once; this replays it with no network and no tokens.
 
-Runs only if the `anthropic` package is installed (`pip install tapelog[dev]`);
+Runs only if the `anthropic` package is installed (`pip install promptecho[dev]`);
 skipped otherwise. The cassette matches on model+messages, so no API key is
 needed and no request leaves the machine.
 """
 
 import pytest
 
-import tapelog
+import promptecho
 
 anthropic = pytest.importorskip("anthropic")
 
 
-@tapelog.use_cassette("examples/cassettes/example.yaml", mode="none")
+@promptecho.use_cassette("examples/cassettes/example.yaml", mode="none")
 def test_summarize_replays_from_cassette():
     client = anthropic.Anthropic(api_key="not-needed-for-replay")
     msg = client.messages.create(

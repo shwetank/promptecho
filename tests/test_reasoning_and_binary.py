@@ -7,8 +7,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import httpx
 import pytest
 
-import tapelog
-from tapelog.matcher import DEFAULT_MATCH_ON, fingerprint
+import promptecho
+from promptecho.matcher import DEFAULT_MATCH_ON, fingerprint
 
 PNG = bytes([
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
@@ -81,14 +81,14 @@ def test_binary_image_response_byte_exact(server, tmp_path):
     body = {"model": "image-model",
             "messages": [{"role": "user", "content": "draw"}]}
 
-    with tapelog.use_cassette(cassette, mode="once"):
+    with promptecho.use_cassette(cassette, mode="once"):
         r = httpx.Client().post(f"{base}/image", json=body)
     assert r.content == PNG, "recorded response should reach the SDK unchanged"
     assert HITS["n"] == 1
 
     srv.shutdown()  # replay must not touch the network
 
-    with tapelog.use_cassette(cassette, mode="none"):
+    with promptecho.use_cassette(cassette, mode="none"):
         r2 = httpx.Client().post(f"{base}/image", json=body)
     assert r2.content == PNG, "replay must round-trip the raw image bytes"
     assert HITS["n"] == 1
@@ -117,10 +117,10 @@ def test_base64_in_json_still_works(server, tmp_path):
     cassette = str(tmp_path / "b64.yaml")
     body = {"model": "m", "messages": [{"role": "user", "content": "draw"}]}
 
-    with tapelog.use_cassette(cassette, mode="once"):
+    with promptecho.use_cassette(cassette, mode="once"):
         recorded = httpx.Client().post(f"{base}/x", json=body).json()
     srv.shutdown()
-    with tapelog.use_cassette(cassette, mode="none"):
+    with promptecho.use_cassette(cassette, mode="none"):
         replayed = httpx.Client().post(f"{base}/x", json=body).json()
 
     assert recorded == replayed

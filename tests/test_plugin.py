@@ -4,9 +4,9 @@
 def test_fixture_auto_names_cassette(pytester):
     pytester.makepyfile(
         test_inner="""
-        def test_summarize(tapelog_cassette):
+        def test_summarize(promptecho_cassette):
             # fixture resolves and names the cassette after the test
-            assert tapelog_cassette.path.replace("\\\\", "/").endswith(
+            assert promptecho_cassette.path.replace("\\\\", "/").endswith(
                 "cassettes/test_summarize.yaml"
             )
         """

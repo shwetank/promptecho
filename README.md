@@ -1,14 +1,14 @@
-# tapelog
+# promptecho
 
 **Record & replay for LLM API calls.** Like [`vcrpy`](https://github.com/kevin1024/vcrpy) / [`nock`](https://github.com/nock/nock), but built for the way LLM traffic actually behaves.
 
-Your LLM tests have three problems: they're **flaky** (non-deterministic outputs), **slow** (real network round-trips), and **expensive** (burning tokens in CI on every run). tapelog records each real API call once to a cassette file, then replays it forever — deterministically, instantly, for free.
+Your LLM tests have three problems: they're **flaky** (non-deterministic outputs), **slow** (real network round-trips), and **expensive** (burning tokens in CI on every run). promptecho records each real API call once to a cassette file, then replays it forever — deterministically, instantly, for free.
 
 ```python
-import tapelog
+import promptecho
 from anthropic import Anthropic
 
-@tapelog.use_cassette("cassettes/summarize.yaml")
+@promptecho.use_cassette("cassettes/summarize.yaml")
 def test_summarize():
     client = Anthropic()
     msg = client.messages.create(
@@ -28,14 +28,14 @@ Every run after: replayed from disk. No network, no tokens, no flake.
 
 ## Why not just use vcrpy?
 
-You can — at the HTTP layer, vcrpy works on LLM calls today. tapelog exists because LLM traffic breaks vcrpy's assumptions in four specific ways:
+You can — at the HTTP layer, vcrpy works on LLM calls today. promptecho exists because LLM traffic breaks vcrpy's assumptions in four specific ways:
 
-1. **Matching.** vcrpy matches on raw request bytes. LLM bodies carry volatile fields (client-injected IDs, reordered tools, whitespace) that change the bytes without changing the *meaning* — so byte-matching misses on replay. tapelog matches on a **normalized fingerprint** of the fields that determine the response, and **canonicalizes across providers**: it knows `content: "hi"` equals `content: [{"type":"text","text":"hi"}]`, an Anthropic top-level `system` equals an OpenAI `system`-role message, and an Anthropic `input_schema` tool def equals an OpenAI `function.parameters`. A raw-bytes VCR can't.
-2. **Streaming.** Most LLM calls are SSE streams. tapelog records the event stream and faithfully re-emits it on replay, so `stream=True` and token-by-token iteration work identically against a cassette — including reasoning deltas.
-3. **Binary / multimodal responses.** vcrpy's text-based cassettes silently corrupt raw `image/*` / `audio/*` / `octet-stream` bodies. tapelog detects them by `Content-Type` and base64-encodes them in the cassette, so image-out and audio-out responses round-trip byte-exact.
-4. **Secrets.** API keys live in headers on every call. tapelog redacts them by default — a cassette is safe to commit.
+1. **Matching.** vcrpy matches on raw request bytes. LLM bodies carry volatile fields (client-injected IDs, reordered tools, whitespace) that change the bytes without changing the *meaning* — so byte-matching misses on replay. promptecho matches on a **normalized fingerprint** of the fields that determine the response, and **canonicalizes across providers**: it knows `content: "hi"` equals `content: [{"type":"text","text":"hi"}]`, an Anthropic top-level `system` equals an OpenAI `system`-role message, and an Anthropic `input_schema` tool def equals an OpenAI `function.parameters`. A raw-bytes VCR can't.
+2. **Streaming.** Most LLM calls are SSE streams. promptecho records the event stream and faithfully re-emits it on replay, so `stream=True` and token-by-token iteration work identically against a cassette — including reasoning deltas.
+3. **Binary / multimodal responses.** vcrpy's text-based cassettes silently corrupt raw `image/*` / `audio/*` / `octet-stream` bodies. promptecho detects them by `Content-Type` and base64-encodes them in the cassette, so image-out and audio-out responses round-trip byte-exact.
+4. **Secrets.** API keys live in headers on every call. promptecho redacts them by default — a cassette is safe to commit.
 
-## What tapelog is *not*
+## What promptecho is *not*
 
 - **Not a cache.** Replay matching is exact/normalized and deterministic, on purpose. It does **not** semantically match "different prompt, close enough" — that would put non-determinism back into the harness you're using to remove it. (A separate opt-in fuzzy mode is on the roadmap as a dev-loop convenience; it will never be the default and never used in CI.)
 - **Not an eval.** It freezes a response so your *surrounding code* is testable. Judging whether the response is *good* is a different tool (see roadmap: `toMatchLLMSnapshot()`).
@@ -44,7 +44,7 @@ You can — at the HTTP layer, vcrpy works on LLM calls today. tapelog exists be
 
 ## What it covers
 
-tapelog intercepts at the `httpx` transport layer. **If the SDK uses httpx, tapelog sees the call** — which is almost everything modern.
+promptecho intercepts at the `httpx` transport layer. **If the SDK uses httpx, promptecho sees the call** — which is almost everything modern.
 
 | You're calling | Covered? |
 |---|---|
@@ -66,7 +66,7 @@ This is the dominant pattern for non-Anthropic/non-OpenAI usage, and it Just Wor
 from openai import OpenAI
 client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key="...")
 
-@tapelog.use_cassette("cassettes/openrouter.yaml")
+@promptecho.use_cassette("cassettes/openrouter.yaml")
 def test_via_openrouter():
     r = client.chat.completions.create(
         model="meta-llama/llama-3.1-70b-instruct",
@@ -82,11 +82,11 @@ Detection falls back to body shape when the host is unknown, so localhost gatewa
 ## Install
 
 ```bash
-pip install tapelog   # not yet on PyPI — install from source for now
+pip install promptecho   # not yet on PyPI — install from source for now
 ```
 
 ```bash
-git clone <repo> && cd tapelog
+git clone <repo> && cd promptecho
 pip install -e .
 ```
 
@@ -98,19 +98,19 @@ Requires Python ≥ 3.9 and `httpx ≥ 0.24`.
 
 ### Decorator
 ```python
-@tapelog.use_cassette("cassettes/foo.yaml")
+@promptecho.use_cassette("cassettes/foo.yaml")
 def test_foo(): ...
 ```
 
 ### Context manager
 ```python
-with tapelog.use_cassette("cassettes/foo.yaml"):
+with promptecho.use_cassette("cassettes/foo.yaml"):
     client.messages.create(...)
 ```
 
 ### pytest fixture (auto-named per test)
 ```python
-def test_bar(tapelog_cassette):   # records to cassettes/test_bar.yaml
+def test_bar(promptecho_cassette):   # records to cassettes/test_bar.yaml
     client.messages.create(...)
 ```
 
@@ -127,7 +127,7 @@ Borrowed from vcrpy, so the mental model is free:
 | `all` | record | re-record everything | refreshing fixtures |
 
 ```python
-@tapelog.use_cassette("cassettes/foo.yaml", mode="none")
+@promptecho.use_cassette("cassettes/foo.yaml", mode="none")
 ```
 
 ### Choosing what to match on
@@ -135,7 +135,7 @@ Borrowed from vcrpy, so the mental model is free:
 Defaults to `["model", "messages", "system", "tools", "tool_choice", "reasoning_effort", "reasoning", "thinking"]` — everything that determines the response for a chat-shaped call, including reasoning-model knobs.
 
 ```python
-@tapelog.use_cassette(
+@promptecho.use_cassette(
     "cassettes/foo.yaml",
     match_on=["model", "messages", "system", "temperature"],  # add temperature
 )
@@ -204,7 +204,7 @@ Done:
 Next:
 - [ ] Field-level diff on cassette miss in CI (`mode=none`)
 - [ ] `requests` / `urllib3` interception backend — unlocks boto3-Bedrock and HF `InferenceClient`
-- [ ] `tapelog lint` — find un-recorded calls in a test suite
+- [ ] `promptecho lint` — find un-recorded calls in a test suite
 - [ ] **`toMatchLLMSnapshot()` sibling** — semantic snapshot assertions on top of recorded calls
 
 ## Design
