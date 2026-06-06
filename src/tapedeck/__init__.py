@@ -1,0 +1,76 @@
+"""tapedeck — record & replay for LLM API calls.
+
+Public API:
+    tapedeck.use_cassette(path, mode="once", match_on=None)   # decorator + context manager
+    tapedeck.Mode                                             # record modes
+"""
+
+from __future__ import annotations
+
+import functools
+from contextlib import contextmanager
+
+from .cassette import Cassette
+from .transport import Mode
+
+__all__ = ["use_cassette", "Mode", "Cassette"]
+__version__ = "0.0.0"
+
+
+@contextmanager
+def _activate(cassette: Cassette, mode: Mode):
+    """Install the tapedeck httpx transport for the duration of the block.
+
+    Sketch: this is where we patch httpx so every client routes through
+    TapedeckTransport (see transport.py / DESIGN.md §1), then restore on exit
+    and flush the cassette to disk.
+    """
+    # TODO: patch httpx transport here.
+    try:
+        yield cassette
+    finally:
+        cassette.save()
+        # TODO: restore original httpx transport.
+
+
+class _UseCassette:
+    """Works as both a decorator and a context manager (like vcrpy.use_cassette)."""
+
+    def __init__(self, path: str, mode: str | Mode = Mode.ONCE, match_on=None):
+        self.path = path
+        self.mode = Mode(mode)
+        self.match_on = match_on
+
+    def _load(self) -> Cassette:
+        return Cassette.load(self.path, match_on=self.match_on)
+
+    def __enter__(self):
+        self._cm = _activate(self._load(), self.mode)
+        return self._cm.__enter__()
+
+    def __exit__(self, *exc):
+        return self._cm.__exit__(*exc)
+
+    def __call__(self, func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with _activate(self._load(), self.mode):
+                return func(*args, **kwargs)
+
+        return wrapper
+
+
+def use_cassette(path: str, mode: str | Mode = Mode.ONCE, match_on=None) -> _UseCassette:
+    """Record on first run, replay forever after.
+
+    Usage as a decorator::
+
+        @tapedeck.use_cassette("cassettes/foo.yaml")
+        def test_foo(): ...
+
+    or as a context manager::
+
+        with tapedeck.use_cassette("cassettes/foo.yaml", mode="none"):
+            client.messages.create(...)
+    """
+    return _UseCassette(path, mode=mode, match_on=match_on)

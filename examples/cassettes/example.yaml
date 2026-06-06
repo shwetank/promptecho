@@ -1,0 +1,32 @@
+version: 1
+match_on: [model, messages, system, tools, tool_choice]
+interactions:
+  - request:
+      method: POST
+      url: https://api.anthropic.com/v1/messages
+      match_key: ef43f6acaed95b2f
+      matched_on: [model, messages, system, tools, tool_choice]
+      body:
+        model: claude-opus-4-8
+        max_tokens: 100
+        messages:
+          - role: user
+            content: "Summarize: the cat sat on the mat."
+    response:
+      status: 200
+      headers:
+        content-type: application/json
+        x-api-key: REDACTED
+      streaming: false
+      body:
+        id: msg_01XfExample
+        type: message
+        role: assistant
+        model: claude-opus-4-8
+        content:
+          - type: text
+            text: "A cat sat on a mat."
+        stop_reason: end_turn
+        usage:
+          input_tokens: 14
+          output_tokens: 8
