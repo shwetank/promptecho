@@ -9,7 +9,13 @@ from __future__ import annotations
 import hashlib
 import json
 
-DEFAULT_MATCH_ON = ["model", "messages", "system", "tools", "tool_choice"]
+DEFAULT_MATCH_ON = [
+    "model", "messages", "system", "tools", "tool_choice",
+    # Reasoning-model knobs that change the response without changing the prompt:
+    # OpenAI o-series, Anthropic extended thinking, OpenRouter unified field.
+    # If these aren't matched, "reasoning_effort=high" and "low" tests collide.
+    "reasoning_effort", "reasoning", "thinking",
+]
 
 
 def canonical_json(obj: object) -> str:

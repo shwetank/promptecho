@@ -12,6 +12,7 @@ are captured as their ordered events and re-emitted byte-for-byte on replay.
 
 from __future__ import annotations
 
+import base64
 import json
 
 import httpx
@@ -41,12 +42,32 @@ def _split_sse(text: str) -> list[str]:
     return [part + "\n\n" for part in text.split("\n\n") if part.strip()]
 
 
+def _is_binary_content_type(ct: str) -> bool:
+    """Content types we must not decode as text — images, audio, video, octet-stream.
+
+    Anything text/* or application/json|xml|...+json round-trips cleanly through
+    YAML; everything else (image/png, audio/wav, application/octet-stream, etc.)
+    gets base64-encoded to preserve bytes exactly.
+    """
+    ct = ct.split(";", 1)[0].strip().lower()
+    if not ct:
+        return False
+    if ct.startswith(("image/", "audio/", "video/")):
+        return True
+    if ct in {"application/octet-stream", "application/pdf", "application/zip"}:
+        return True
+    return False
+
+
 def _capture(status: int, headers: httpx.Headers, data: bytes) -> Rec:
     clean = _clean_headers(headers)
     content_type = clean.get("content-type", "")
     if "text/event-stream" in content_type:
         return Rec(status=status, headers=clean, streaming=True,
                    events=_split_sse(data.decode("utf-8", "replace")))
+    if _is_binary_content_type(content_type):
+        return Rec(status=status, headers=clean, streaming=False,
+                   body=base64.b64encode(data).decode("ascii"), binary=True)
     try:
         body = json.loads(data) if data else None
     except ValueError:
@@ -57,6 +78,8 @@ def _capture(status: int, headers: httpx.Headers, data: bytes) -> Rec:
 def _to_httpx(rec: Rec, request: httpx.Request) -> httpx.Response:
     if rec.streaming:
         content = "".join(rec.events).encode("utf-8")
+    elif rec.binary and isinstance(rec.body, str):
+        content = base64.b64decode(rec.body)
     elif isinstance(rec.body, (dict, list)):
         content = json.dumps(rec.body).encode("utf-8")
     elif isinstance(rec.body, str):

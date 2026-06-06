@@ -24,8 +24,9 @@ class Response:
     status: int
     headers: dict
     streaming: bool = False
-    body: object | None = None          # non-streaming JSON body
+    body: object | None = None          # non-streaming body: JSON, str, or base64 str when binary
     events: list[str] = field(default_factory=list)  # ordered raw SSE events
+    binary: bool = False                # if True, body is base64-encoded raw bytes
 
 
 @dataclass
@@ -100,6 +101,8 @@ def _redact_response(resp: Response) -> Response:
 def _interaction_to_dict(ix: Interaction) -> dict:
     r = ix.response
     response = {"status": r.status, "headers": r.headers, "streaming": r.streaming}
+    if r.binary:
+        response["binary"] = True
     if r.streaming:
         response["events"] = r.events
     else:
@@ -130,5 +133,6 @@ def _interaction_from_dict(d: dict) -> Interaction:
             streaming=resp.get("streaming", False),
             body=resp.get("body"),
             events=resp.get("events", []),
+            binary=resp.get("binary", False),
         ),
     )

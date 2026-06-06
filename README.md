@@ -47,6 +47,23 @@ pip install tapedeck   # not yet on PyPI — install from source for now
 
 Provider-agnostic: works with any client built on `httpx` (Anthropic, OpenAI, and most others), because interception happens at the HTTP transport layer, not in the SDK.
 
+**Hosted open-source / fine-tuned models (OpenRouter, Together, Fireworks, Cerebras, Groq, self-hosted vLLM/TGI/SGLang)** all work the same way — you're using the OpenAI SDK with a custom `base_url`, which is httpx, which is what tapedeck intercepts:
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key="...")
+
+@tapedeck.use_cassette("cassettes/openrouter.yaml")
+def test_via_openrouter():
+    r = client.chat.completions.create(
+        model="meta-llama/llama-3.1-70b-instruct",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+    assert r.choices[0].message.content
+```
+
+For the full list of what's covered (and what isn't — boto3-Bedrock, HF `InferenceClient`, in-process models), see [**SUPPORT.md**](SUPPORT.md).
+
 ## Usage
 
 ### Decorator
@@ -134,7 +151,10 @@ server shut down (`tests/test_record_replay.py`). Not yet published to PyPI.
 - [x] SSE streaming record/replay
 - [x] pytest plugin + auto-naming
 - [x] per-provider request normalizers (Anthropic / OpenAI / generic)
+- [x] reasoning-model match defaults (`reasoning_effort`, `thinking`, `reasoning`)
+- [x] binary response round-trip (image/audio/octet-stream — base64 in cassette)
 - [ ] field-level diff on cassette miss in CI
+- [ ] `requests`/`urllib3` interception backend (unlocks boto3-Bedrock, HF `InferenceClient`)
 - [ ] `tapedeck lint` — find un-recorded calls in a test suite
 - [ ] **`toMatchLLMSnapshot()` sibling** — semantic snapshot assertions on top of recorded calls
 
