@@ -190,6 +190,19 @@ reasonable addition.
   acknowledged: user code that does `except Exception:` around a
   `use_cassette` block won't catch the miss either — but that's the right
   behavior, since a test-fixture failure should never be silently swallowed.
+- ~~**Non-2xx responses silently recorded.**~~ **Done in v0.1.2** — a transient
+  401/429/5xx during recording (expired key, rate limit, upstream blip) was
+  baked into the cassette and replayed identically forever, often masked by
+  the app's own retry/degrade logic into green tests over poisoned fixtures.
+  `on_record_error` now controls policy: `"warn"` (default — emits
+  `PromptechoRecordingWarning`, still records so the user can inspect),
+  `"raise"` (aborts before the cassette is written, no poison touches disk),
+  `"record"` (legacy silent — for tests that legitimately want to capture an
+  error, e.g. asserting 429-retry behavior). The default `"warn"` was chosen
+  over `"raise"` because the legitimate error-recording case is real and
+  forcing everyone to opt out would break valid use; `warnings.filterwarnings`
+  lets paranoid CI escalate warnings to errors project-wide. Discovered by an
+  external contributor's spike — first user-found bug fix.
 - **Drift detection.** An optional `mode=all` run in a nightly (not PR) CI job
   that re-records and flags when a model's output to a frozen prompt has changed
   — turning cassettes into a cheap model-regression tripwire. The hardest part

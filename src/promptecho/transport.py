@@ -21,6 +21,20 @@ class Mode(str, Enum):
     ALL = "all"             # always re-record
 
 
+class RecordedErrorResponse(BaseException):
+    """Raised when ``on_record_error='raise'`` and the upstream returns >= 400.
+
+    Inherits from ``BaseException`` (not ``Exception``) for the same reason as
+    ``CassetteMiss``: LLM SDK transport layers wrap any ``Exception`` in their
+    own connection-error type (e.g. ``openai.APIConnectionError``), which
+    hides the diagnostic at the top of pytest's failure summary. Bypassing
+    ``except Exception:`` ensures the message reaches the test runner intact.
+
+    Catch with ``except RecordedErrorResponse:`` or
+    ``pytest.raises(RecordedErrorResponse)`` if you genuinely need to.
+    """
+
+
 class CassetteMiss(BaseException):
     """Raised in mode=none when an incoming request has no recording.
 

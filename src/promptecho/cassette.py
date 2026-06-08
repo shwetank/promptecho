@@ -19,6 +19,26 @@ REDACTED = "REDACTED"
 REDACT_HEADERS = {"authorization", "x-api-key", "openai-organization"}
 
 
+class PromptechoRecordingWarning(UserWarning):
+    """Emitted when promptecho records a non-2xx response.
+
+    A transient 401/429/5xx during recording (e.g. an expired key, a rate
+    limit, an upstream blip) is baked into the cassette and replays identically
+    on every subsequent run — often silently masked by the app's own
+    retry/degrade logic, producing green tests over poisoned fixtures.
+
+    The default ``on_record_error='warn'`` policy surfaces every such recording.
+    To convert these to hard errors across a whole test suite::
+
+        import warnings
+        from promptecho import PromptechoRecordingWarning
+        warnings.filterwarnings("error", category=PromptechoRecordingWarning)
+
+    To silence (for example, in tests that intentionally record 429s to verify
+    retry logic) pass ``on_record_error='record'`` to ``use_cassette``.
+    """
+
+
 @dataclass
 class Response:
     status: int

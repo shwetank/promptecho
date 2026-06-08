@@ -202,6 +202,7 @@ Done:
 - [x] Reasoning-model match defaults (`reasoning_effort`, `thinking`, `reasoning`)
 - [x] Binary response round-trip (image/audio/octet-stream — base64 in cassette)
 - [x] Field-level diff on cassette miss (CI `mode=none` errors pinpoint the changed path, not just the field name)
+- [x] `on_record_error` policy (`warn` / `raise` / `record`) — prevents silently baking transient 4xx/5xx into cassettes
 
 Next:
 - [ ] `requests` / `urllib3` interception backend — unlocks boto3-Bedrock and HF `InferenceClient`
