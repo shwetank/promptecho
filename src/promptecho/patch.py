@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
 import warnings
 
 import httpx
@@ -159,13 +160,40 @@ def _make_async(cassette, mode, on_record_error, real_fn):
     return handle_async_request
 
 
+# Path of the cassette currently patching httpx, or None. The patch swaps
+# process-global class attributes, so two simultaneously active cassettes
+# would interleave recordings into whichever was installed last and a
+# non-LIFO teardown would leave a stale patch behind. One at a time, loudly.
+_active_cassette_path = None
+_install_lock = threading.Lock()
+
+
 def install(cassette, mode, on_record_error="warn"):
-    """Patch httpx; returns a token to pass back to :func:`uninstall`."""
-    saved = (httpx.HTTPTransport.handle_request, httpx.AsyncHTTPTransport.handle_async_request)
-    httpx.HTTPTransport.handle_request = _make_sync(cassette, mode, on_record_error, saved[0])
-    httpx.AsyncHTTPTransport.handle_async_request = _make_async(cassette, mode, on_record_error, saved[1])
-    return saved
+    """Patch httpx; returns a token to pass back to :func:`uninstall`.
+
+    Raises ``RuntimeError`` if another cassette is already active in this
+    process — nested or concurrent ``use_cassette`` blocks are not supported
+    (see SUPPORT.md). pytest-xdist is unaffected: its workers are separate
+    processes, each with its own patch.
+    """
+    global _active_cassette_path
+    with _install_lock:
+        if _active_cassette_path is not None:
+            raise RuntimeError(
+                f"promptecho: cassette {_active_cassette_path!r} is already active "
+                f"in this process; cannot activate {cassette.path!r}. Nested or "
+                f"concurrent use_cassette blocks are not supported — promptecho "
+                f"patches httpx process-wide, one cassette at a time."
+            )
+        _active_cassette_path = cassette.path
+        saved = (httpx.HTTPTransport.handle_request, httpx.AsyncHTTPTransport.handle_async_request)
+        httpx.HTTPTransport.handle_request = _make_sync(cassette, mode, on_record_error, saved[0])
+        httpx.AsyncHTTPTransport.handle_async_request = _make_async(cassette, mode, on_record_error, saved[1])
+        return saved
 
 
 def uninstall(saved) -> None:
-    httpx.HTTPTransport.handle_request, httpx.AsyncHTTPTransport.handle_async_request = saved
+    global _active_cassette_path
+    with _install_lock:
+        httpx.HTTPTransport.handle_request, httpx.AsyncHTTPTransport.handle_async_request = saved
+        _active_cassette_path = None

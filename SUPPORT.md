@@ -76,6 +76,22 @@ weren't installed.
 
 ---
 
+## Concurrency
+
+promptecho patches httpx **process-wide**: while a cassette is active, every
+httpx call in the process — from any thread or event loop, LLM or not — routes
+through it. Consequences:
+
+- **One cassette at a time per process.** A nested or concurrent
+  `use_cassette` raises `RuntimeError` immediately rather than silently
+  interleaving recordings into the wrong cassette.
+- **`pytest-xdist` works** — its workers are separate processes, each with its
+  own patch.
+- Background threads making non-LLM httpx calls during an active cassette get
+  recorded/replayed too. Keep unrelated traffic out of cassette blocks.
+
+---
+
 ## Reporting a gap
 
 - **Call is on httpx but isn't being captured?** That's a bug. File an issue with

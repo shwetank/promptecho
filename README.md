@@ -209,6 +209,12 @@ Next:
 - [ ] `promptecho lint` — find un-recorded calls in a test suite
 - [ ] **`toMatchLLMSnapshot()` sibling** — semantic snapshot assertions on top of recorded calls
 
+## FAQ
+
+### Can I run cassettes concurrently?
+
+One cassette at a time per process — promptecho patches httpx process-wide, and a nested or concurrent `use_cassette` raises `RuntimeError` immediately rather than interleaving recordings. `pytest-xdist` is fine (workers are separate processes). Note that while a cassette is active it intercepts **all** httpx traffic in the process, not just LLM calls.
+
 ## Design
 
 For the why-not-the-other-way decisions — fingerprint vs raw bytes, why semantic matching is fenced off, how SSE re-emission works, how cross-provider normalization is structured — see [DESIGN.md](DESIGN.md).
