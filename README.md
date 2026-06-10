@@ -225,6 +225,14 @@ Next:
 
 ## FAQ
 
+### "If you replay a frozen response, aren't you testing nothing? The model is the risky part."
+
+You're testing everything *except* the model — which is most of your code: response parsing, tool-call dispatch, streaming UI rendering, retry/fallback logic, prompt construction (a changed prompt is a cassette miss, so drift gets caught, not masked). That layer is deterministic and belongs in fast, free CI. Judging whether the model's *output is good* is an eval — a genuinely different job, run on a different cadence with a different budget (see deepeval, promptfoo, braintrust). You need both; promptecho is deliberately only the first. The roadmap `toMatchLLMSnapshot()` is the bridge between them.
+
+### Why does `CassetteMiss` inherit from `BaseException`?
+
+Because the OpenAI / Anthropic / Mistral SDKs all wrap any `Exception` raised inside their transport into their own connection-error type (`openai.APIConnectionError("Connection error.")`), which would bury the field-level diff — the most useful thing promptecho produces — under a generic message at the top of your pytest failure. Inheriting from `BaseException` (the same trick `pytest.fail`'s internal exception uses) lets the diagnostic pass through `except Exception:` blocks intact. The trade-off is deliberate: your own `except Exception:` won't catch it either — but a test-fixture failure should never be silently swallowed. `except CassetteMiss:` and `pytest.raises(CassetteMiss)` both still work. Full rationale in [DESIGN.md](DESIGN.md).
+
 ### Can I run cassettes concurrently?
 
 One cassette at a time per process — promptecho patches httpx process-wide, and a nested or concurrent `use_cassette` raises `RuntimeError` immediately rather than interleaving recordings. `pytest-xdist` is fine (workers are separate processes). Note that while a cassette is active it intercepts **all** httpx traffic in the process, not just LLM calls.
