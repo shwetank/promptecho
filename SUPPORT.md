@@ -83,7 +83,7 @@ weren't installed.
 - **Your client uses `requests` / `aiohttp` / `urllib3`?** That's a known v1 gap.
   Tell us which SDK and use case — it's how the second-backend roadmap item gets
   prioritized.
-- **Cassette miss in `mode=none` that you don't understand?** Field-level diff on
-  miss is coming (`matcher.diff_fields()` already exists, surfacing in CI is the
-  open work). For now: temporarily switch to `mode="once"`, diff the new cassette
-  against the old one to see which field tripped the fingerprint.
+- **Cassette miss in `mode=none` that you don't understand?** The error message
+  includes a field-level diff against the most similar recording (exact path,
+  recorded vs incoming value). If the diff doesn't explain it, file an issue
+  with the message — that's a diagnostics bug we want to fix.

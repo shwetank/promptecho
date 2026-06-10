@@ -1,5 +1,5 @@
-"""URL query-string redaction — cassettes must be safe to commit even with
-query-param auth."""
+"""URL query-string redaction (cassettes must be safe to commit even with
+query-param auth) and nearest-recording selection for the miss diff."""
 
 import json
 import threading
@@ -11,6 +11,7 @@ import yaml
 
 import promptecho
 from promptecho.cassette import REDACT_HEADERS, _redact_url
+from promptecho.transport import CassetteMiss
 
 
 # --- unit: _redact_url ------------------------------------------------------
@@ -83,3 +84,33 @@ def test_query_auth_and_cookies_never_reach_the_cassette(server, tmp_path):
             json={"model": "m", "messages": []},
         )
     assert r2.json() == {"ok": True}
+
+
+# --- nearest-recording selection for the miss diff --------------------------
+
+def test_miss_diff_picks_most_similar_recording_not_last(server, tmp_path):
+    srv, base = server
+    cassette = str(tmp_path / "many.yaml")
+
+    with promptecho.use_cassette(cassette, mode="once"):
+        for prompt in ["alpha prompt", "summarize: the cat sat on the mat", "zeta prompt"]:
+            httpx.Client().post(
+                f"{base}/x",
+                json={"model": "m", "messages": [{"role": "user", "content": prompt}]},
+            )
+    srv.shutdown()
+
+    # One word changed from the MIDDLE recording. The diff must be computed
+    # against that one — diffing against the last ("zeta prompt") would show a
+    # useless whole-string mismatch.
+    with pytest.raises(CassetteMiss) as exc:
+        with promptecho.use_cassette(cassette, mode="none"):
+            httpx.Client().post(
+                f"{base}/x",
+                json={"model": "m",
+                      "messages": [{"role": "user", "content": "summarize: the dog sat on the mat"}]},
+            )
+    msg = str(exc.value)
+    assert "the cat sat on the mat" in msg, "diff must be against the most similar recording"
+    assert "the dog sat on the mat" in msg
+    assert "zeta prompt" not in msg

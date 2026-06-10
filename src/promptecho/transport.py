@@ -7,13 +7,14 @@ network and record. The actual httpx wiring (next to TODOs) lives at the bottom.
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 from enum import Enum
 from urllib.parse import urlsplit
 
 from .cassette import Cassette, Response
-from .matcher import RAW_BODY_KEY, diff_request, fingerprint
+from .matcher import RAW_BODY_KEY, canonical_json, diff_request, fingerprint, pick
 
 
 class Mode(str, Enum):
@@ -97,8 +98,31 @@ def decide(mode: Mode, cassette: Cassette, body: dict, method: str = "", path: s
     return Decision(record=True)
 
 
+def _nearest_interaction(cassette: Cassette, body: dict, method: str, path: str):
+    """The recording most similar to the incoming request — fewest differing
+    leaves, with method/path mismatches counted in. Diffing against an
+    arbitrary recording (e.g. the last one) produces a misleading diff when a
+    cassette holds many interactions."""
+    incoming_canon = canonical_json(pick(body, cassette.match_on))
+    best, best_score = None, None
+    for ix in cassette.interactions:
+        score = len(diff_request(body, ix.body, cassette.match_on).splitlines())
+        if method and ix.method and method.upper() != ix.method.upper():
+            score += 3
+        if path and urlsplit(ix.url).path != path:
+            score += 3
+        # Tiebreaker between recordings with the same leaf count: textual
+        # closeness of the matched fields ("one word changed" should beat
+        # "entirely different prompt").
+        recorded_canon = canonical_json(pick(ix.body, cassette.match_on))
+        score += 1 - difflib.SequenceMatcher(None, incoming_canon, recorded_canon).ratio()
+        if best_score is None or score < best_score:
+            best, best_score = ix, score
+    return best
+
+
 def _miss_message(cassette: Cassette, body: dict, method: str = "", path: str = "") -> str:
-    nearest = cassette.interactions[-1] if cassette.interactions else None
+    nearest = _nearest_interaction(cassette, body, method, path)
     if nearest is None:
         return (
             f"Cassette miss: {cassette.path!r} has no recordings and mode=none.\n"
