@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 import os
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 import yaml
 
@@ -17,6 +18,10 @@ from .matcher import DEFAULT_MATCH_ON, fingerprint
 
 REDACTED = "REDACTED"
 REDACT_HEADERS = {"authorization", "x-api-key", "openai-organization"}
+
+# v2: match keys cover the HTTP method and URL path (and non-JSON bodies are
+# keyed by a raw-byte hash), so v1 keys can never match — refuse to load them.
+CASSETTE_VERSION = 2
 
 
 class PromptechoRecordingWarning(UserWarning):
@@ -74,7 +79,7 @@ class Cassette:
         return None
 
     def record(self, method: str, url: str, body: dict, response: Response) -> None:
-        key = fingerprint(body, self.match_on)
+        key = fingerprint(body, self.match_on, method=method, path=urlsplit(url).path)
         self.interactions.append(
             Interaction(
                 method=method,
@@ -95,6 +100,14 @@ class Cassette:
             return cls(path=path, match_on=mo)
         with open(path) as f:
             raw = yaml.safe_load(f) or {}
+        version = raw.get("version", 1)
+        if raw and version != CASSETTE_VERSION:
+            raise ValueError(
+                f"{path!r} is a promptecho cassette with format version {version}; "
+                f"this promptecho reads version {CASSETTE_VERSION} (match keys now "
+                f"include the request method and URL path). Delete the cassette "
+                f"and re-record."
+            )
         interactions = [_interaction_from_dict(d) for d in raw.get("interactions", [])]
         return cls(path=path, match_on=raw.get("match_on", mo), interactions=interactions)
 
@@ -103,7 +116,7 @@ class Cassette:
             return
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
         doc = {
-            "version": 1,
+            "version": CASSETTE_VERSION,
             "match_on": self.match_on,
             "interactions": [_interaction_to_dict(ix) for ix in self.interactions],
         }

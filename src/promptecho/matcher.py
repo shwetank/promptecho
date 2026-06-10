@@ -17,6 +17,12 @@ DEFAULT_MATCH_ON = [
     "reasoning_effort", "reasoning", "thinking",
 ]
 
+# Stand-in field for requests whose body isn't a JSON object (multipart uploads,
+# form-encoded, raw binary, bare JSON scalars/arrays). Holds a sha256 of the
+# exact request bytes so two distinct non-JSON payloads can never collide on an
+# empty parse. Always part of the fingerprint, regardless of match_on.
+RAW_BODY_KEY = "__raw_body_sha256__"
+
 
 def canonical_json(obj: object) -> str:
     """Stable serialization: sorted keys, no insignificant whitespace.
@@ -31,14 +37,26 @@ def pick(body: dict, match_on: list[str]) -> dict:
     return {k: body[k] for k in match_on if k in body}
 
 
-def fingerprint(body: dict, match_on: list[str] | None = None) -> str:
-    """Map a request body to the cassette key for the recording it should replay.
+def fingerprint(
+    body: dict,
+    match_on: list[str] | None = None,
+    method: str = "",
+    path: str = "",
+) -> str:
+    """Map a request to the cassette key for the recording it should replay.
 
     The same logical request always yields the same key; volatile fields that
-    aren't in ``match_on`` cannot affect it.
+    aren't in ``match_on`` cannot affect it. The HTTP method and URL path are
+    always part of the key — two different endpoints called with the same body
+    must never replay each other's recordings. The host stays out: it carries
+    no meaning for matching and would break replaying a recording made against
+    one gateway through another (or a test server on a random port).
     """
     fields = pick(body, match_on or DEFAULT_MATCH_ON)
-    digest = hashlib.sha256(canonical_json(fields).encode("utf-8")).hexdigest()
+    if RAW_BODY_KEY in body:
+        fields[RAW_BODY_KEY] = body[RAW_BODY_KEY]
+    envelope = {"method": method.upper(), "path": path, "fields": fields}
+    digest = hashlib.sha256(canonical_json(envelope).encode("utf-8")).hexdigest()
     return digest[:16]
 
 

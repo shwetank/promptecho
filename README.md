@@ -155,13 +155,13 @@ Works identically with `httpx.AsyncClient` and the async surfaces of Anthropic /
 Human-readable YAML, designed to diff cleanly in PRs:
 
 ```yaml
-version: 1
+version: 2
 match_on: [model, messages, system, tools, tool_choice, reasoning_effort, reasoning, thinking]
 interactions:
   - request:
       method: POST
       url: https://api.anthropic.com/v1/messages
-      match_key: ef43f6acaed95b2f        # fingerprint of matched fields
+      match_key: 7d206bed48a0bc0c        # fingerprint of method + URL path + matched fields
       matched_on: [model, messages, system, tools, tool_choice]
       body:                              # canonical (provider-normalized) body
         model: claude-opus-4-8

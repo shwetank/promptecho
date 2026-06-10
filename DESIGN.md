@@ -43,15 +43,30 @@ carry volatile noise — client-injected request IDs, reordered `tools` arrays,
 key-order and whitespace differences from re-serialization. Same call, different
 bytes, missed match.
 
-So we compute a **fingerprint** over only the fields that determine the response:
+So we compute a **fingerprint** over the request identity plus only the body
+fields that determine the response:
 
 ```
-fingerprint(body) = sha256( canonical_json( pick(body, match_on) ) )
+fingerprint(request) = sha256( canonical_json(
+    {method, url_path, fields: pick(body, match_on)}
+) )
 ```
 
 - `canonical_json` sorts keys and strips insignificant whitespace, so
   re-serialization can't change the key.
 - Volatile fields are simply not in `match_on`, so they can't affect the match.
+- The **HTTP method and URL path are always in the key** — two endpoints called
+  with the same body must never replay each other's recordings. The *host* is
+  deliberately left out: it carries no matching meaning, and excluding it lets a
+  recording made against one gateway replay through another (or a local test
+  server on a random port).
+- A body that isn't a JSON object (multipart upload, form-encoded, raw binary)
+  is keyed by a **sha256 of its exact bytes** instead of parsing to `{}` — so
+  two different uploads can't collide on an empty parse and silently replay the
+  wrong recording.
+
+This is cassette format **version 2** (v0.1.3); v1 cassettes are refused at
+load with an instruction to re-record, since their keys can never match.
 
 The default `match_on` is:
 ```python

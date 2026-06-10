@@ -132,7 +132,7 @@ def _apply_record_error_policy(rec: Rec, cassette_path: str, policy: str) -> Non
 def _make_sync(cassette, mode, on_record_error, real_fn):
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         body = normalize(str(request.url), _request_body(request))
-        decision = decide(mode, cassette, body)
+        decision = decide(mode, cassette, body, method=request.method, path=request.url.path)
         if decision.response is not None:                      # REPLAY (no network)
             return _to_httpx(decision.response, request)
         real = real_fn(self, request)                          # PASS THROUGH
@@ -147,7 +147,7 @@ def _make_sync(cassette, mode, on_record_error, real_fn):
 def _make_async(cassette, mode, on_record_error, real_fn):
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         body = normalize(str(request.url), _request_body(request))
-        decision = decide(mode, cassette, body)
+        decision = decide(mode, cassette, body, method=request.method, path=request.url.path)
         if decision.response is not None:
             return _to_httpx(decision.response, request)
         real = await real_fn(self, request)

@@ -1,10 +1,10 @@
-version: 1
+version: 2
 match_on: [model, messages, system, tools, tool_choice]
 interactions:
   - request:
       method: POST
       url: https://api.anthropic.com/v1/messages
-      match_key: ef43f6acaed95b2f
+      match_key: 7d206bed48a0bc0c
       matched_on: [model, messages, system, tools, tool_choice]
       body:
         model: claude-opus-4-8

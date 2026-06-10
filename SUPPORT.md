@@ -59,7 +59,7 @@ weren't installed.
 | Native TGI `/generate`, custom non-chat bodies | ⚠️ | Default `match_on` won't see the body — pass `match_on=["inputs","parameters"]` |
 | Embeddings (`/v1/embeddings`) | ⚠️ | Captured; override match: `match_on=["model","input","encoding_format"]` |
 | Audio transcription (`/v1/audio/transcriptions`) | ⚠️ | Uses `multipart/form-data` for the audio upload — see below |
-| **Bedrock model id in URL path** (not the body) | ⚠️ | Even if you intercept the httpx call, `model` falls out of the fingerprint — split cassettes per model |
+| **Bedrock model id in URL path** (not the body) | ✅ | The URL path is part of the fingerprint (cassette format v2), so calls to different models can't collide even when `model` is absent from the body |
 
 ---
 
@@ -72,7 +72,7 @@ weren't installed.
 | **Multimodal as JSON** — base64 image/audio inside content blocks (Claude image-in/out, OpenAI vision, GPT-4o image-out) | ✅ | The base64 string lives in the JSON; round-trip is byte-exact |
 | **Raw binary** — `image/*`, `audio/*`, `video/*`, `application/octet-stream`, `pdf`, `zip` | ✅ | Detected by `Content-Type`, base64-encoded in the cassette; replay decodes back. Verified byte-equal in `tests/test_reasoning_and_binary.py::test_binary_image_response_byte_exact` |
 | Encrypted reasoning blobs (OpenAI `reasoning.encrypted_content`) | ✅ | Opaque field, round-trips verbatim in the JSON body |
-| `multipart/form-data` (file uploads/downloads, audio transcription requests) | ❌ | Not supported in v1 — large payloads, encoding edge cases. Avoid recording these. |
+| `multipart/form-data` (file uploads/downloads, audio transcription requests) | ⚠️ | Recorded and replayed; the request is matched by an exact hash of its raw bytes (cassette format v2), so any byte change (including multipart boundary strings, which some clients randomize per request) is a miss. Fine for stable payloads; no field-level matching or diffs. |
 
 ---
 

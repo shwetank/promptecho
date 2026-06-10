@@ -7,11 +7,13 @@ network and record. The actual httpx wiring (next to TODOs) lives at the bottom.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from enum import Enum
+from urllib.parse import urlsplit
 
 from .cassette import Cassette, Response
-from .matcher import diff_request, fingerprint
+from .matcher import RAW_BODY_KEY, diff_request, fingerprint
 
 
 class Mode(str, Enum):
@@ -56,9 +58,16 @@ def parse_body(raw: bytes) -> dict:
     if not raw:
         return {}
     try:
-        return json.loads(raw)
+        parsed = json.loads(raw)
     except (ValueError, UnicodeDecodeError):
-        return {}
+        parsed = None
+    if isinstance(parsed, dict):
+        return parsed
+    # Non-JSON (multipart, form-encoded, binary) or non-object JSON: key the
+    # request by a hash of its exact bytes. Mapping these to {} would make
+    # every such request share one fingerprint and silently replay whichever
+    # recording landed first.
+    return {RAW_BODY_KEY: hashlib.sha256(raw).hexdigest()}
 
 
 class Decision:
@@ -69,9 +78,9 @@ class Decision:
         self.record = record
 
 
-def decide(mode: Mode, cassette: Cassette, body: dict) -> Decision:
+def decide(mode: Mode, cassette: Cassette, body: dict, method: str = "", path: str = "") -> Decision:
     """Core branch. No I/O — caller performs the network call / persistence."""
-    key = fingerprint(body, cassette.match_on)
+    key = fingerprint(body, cassette.match_on, method=method, path=path)
     existing = cassette.find(key)
 
     if mode is Mode.ALL:
@@ -79,7 +88,7 @@ def decide(mode: Mode, cassette: Cassette, body: dict) -> Decision:
 
     if mode is Mode.NONE:
         if existing is None:
-            raise CassetteMiss(_miss_message(cassette, body))
+            raise CassetteMiss(_miss_message(cassette, body, method, path))
         return Decision(response=existing.response)
 
     # ONCE and NEW_EPISODES: replay if we have it, otherwise record.
@@ -88,7 +97,7 @@ def decide(mode: Mode, cassette: Cassette, body: dict) -> Decision:
     return Decision(record=True)
 
 
-def _miss_message(cassette: Cassette, body: dict) -> str:
+def _miss_message(cassette: Cassette, body: dict, method: str = "", path: str = "") -> str:
     nearest = cassette.interactions[-1] if cassette.interactions else None
     if nearest is None:
         return (
@@ -96,6 +105,16 @@ def _miss_message(cassette: Cassette, body: dict) -> str:
             f"Re-record with mode='once' (or delete and re-run the test)."
         )
     diff = diff_request(body, nearest.body, cassette.match_on)
+    extra = []
+    if method and nearest.method and method.upper() != nearest.method.upper():
+        extra.append(f"  method:\n    recorded: {nearest.method}\n    incoming: {method}")
+    recorded_path = urlsplit(nearest.url).path
+    if path and recorded_path != path:
+        extra.append(f"  url path:\n    recorded: {recorded_path}\n    incoming: {path}")
+    if (RAW_BODY_KEY in body or RAW_BODY_KEY in nearest.body) and \
+            body.get(RAW_BODY_KEY) != nearest.body.get(RAW_BODY_KEY):
+        extra.append("  body: non-JSON request bodies differ (matched by raw-byte hash)")
+    diff = "\n".join(filter(None, [diff, *extra]))
     if not diff:
         return (
             f"Cassette miss in {cassette.path!r} (mode=none): a matched field has a "
