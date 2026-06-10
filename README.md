@@ -180,7 +180,7 @@ interactions:
 - **Binary** responses (image/audio/octet-stream) get `binary: true` and the body is base64-encoded; replay decodes and returns the original bytes.
 - **The stored body is the canonical, provider-normalized shape** — not the raw provider JSON. That makes cassettes provider-agnostic and easier to skim in code review.
 
-Auto-redacted on record: `authorization`, `x-api-key`, `openai-organization`. Configurable.
+Auto-redacted on record: the `authorization`, `x-api-key`, `openai-organization`, and `set-cookie` headers, plus **every URL query-string value** (query-param auth like `?key=…` never reaches disk). Configurable. Secrets *inside prompt text* are not auto-detected — don't put credentials in prompts.
 
 See [`examples/cassettes/example.yaml`](examples/cassettes/example.yaml) for a real one.
 

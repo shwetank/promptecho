@@ -10,14 +10,14 @@ from __future__ import annotations
 import dataclasses
 import os
 from dataclasses import dataclass, field
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import yaml
 
 from .matcher import DEFAULT_MATCH_ON, fingerprint
 
 REDACTED = "REDACTED"
-REDACT_HEADERS = {"authorization", "x-api-key", "openai-organization"}
+REDACT_HEADERS = {"authorization", "x-api-key", "openai-organization", "set-cookie"}
 
 # v2: match keys cover the HTTP method and URL path (and non-JSON bodies are
 # keyed by a raw-byte hash), so v1 keys can never match — refuse to load them.
@@ -83,7 +83,7 @@ class Cassette:
         self.interactions.append(
             Interaction(
                 method=method,
-                url=url,
+                url=_redact_url(url),
                 match_key=key,
                 matched_on=list(self.match_on),
                 body=body,
@@ -126,6 +126,20 @@ class Cassette:
 
 
 # --- (de)serialization helpers -------------------------------------------
+def _redact_url(url: str) -> str:
+    """Blank every query-parameter value before the URL touches a cassette.
+
+    Query-string auth is real (Google-style ``?key=…``, in-house gateways with
+    ``?api_key=…``), and the fingerprint never reads the query, so redacting
+    values can't affect matching. Parameter names are kept for debuggability.
+    """
+    parts = urlsplit(url)
+    if not parts.query:
+        return url
+    redacted = [(name, REDACTED) for name, _ in parse_qsl(parts.query, keep_blank_values=True)]
+    return urlunsplit(parts._replace(query=urlencode(redacted)))
+
+
 def _redact_response(resp: Response) -> Response:
     headers = {k: (REDACTED if k.lower() in REDACT_HEADERS else v) for k, v in resp.headers.items()}
     return dataclasses.replace(resp, headers=headers)
