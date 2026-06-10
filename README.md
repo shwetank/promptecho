@@ -19,8 +19,8 @@ def test_summarize():
     assert "cat" in msg.content[0].text.lower()
 ```
 
-First run: one real call, recorded to `cassettes/summarize.yaml`.
-Every run after: replayed from disk. No network, no tokens, no flake.
+First run: one real call, recorded to `cassettes/summarize.yaml` — this needs the provider SDK installed (`pip install anthropic`) and a real `ANTHROPIC_API_KEY` in the environment.
+Every run after: replayed from disk. No network, no tokens, no API key, no flake.
 
 > **Proof, not marketing.** The end-to-end test that gates every release records against a local server, **shuts the server down**, then replays. Same response, zero network. If the response can come back with the upstream gone, the cassette is genuinely doing the work — not a partial proxy. See [`tests/test_record_replay.py`](tests/test_record_replay.py).
 

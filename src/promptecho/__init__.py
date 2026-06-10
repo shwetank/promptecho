@@ -23,7 +23,7 @@ __all__ = [
     "use_cassette", "Mode", "Cassette",
     "CassetteMiss", "RecordedErrorResponse", "PromptechoRecordingWarning",
 ]
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 _VALID_ON_RECORD_ERROR = ("record", "warn", "raise")
 
