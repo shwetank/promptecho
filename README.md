@@ -1,5 +1,8 @@
 # promptecho
 
+[![CI](https://github.com/shwetank/promptecho/actions/workflows/ci.yml/badge.svg)](https://github.com/shwetank/promptecho/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/promptecho)](https://pypi.org/project/promptecho/)
+
 **Record & replay for LLM API calls.** Like [`vcrpy`](https://github.com/kevin1024/vcrpy) / [`nock`](https://github.com/nock/nock), but built for the way LLM traffic actually behaves.
 
 Your LLM tests have three problems: they're **flaky** (non-deterministic outputs), **slow** (real network round-trips), and **expensive** (burning tokens in CI on every run). promptecho records each real API call once to a cassette file, then replays it forever — deterministically, instantly, for free.
