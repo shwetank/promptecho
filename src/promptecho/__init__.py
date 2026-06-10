@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import os
 from contextlib import contextmanager
 
 from .cassette import Cassette, PromptechoRecordingWarning
@@ -64,7 +65,11 @@ class _UseCassette:
                 f"got {on_record_error!r}"
             )
         self.path = path
-        self.mode = Mode(mode)
+        # PROMPTECHO_MODE overrides every cassette's mode — the suite-wide
+        # workflow for "my prompts changed, refresh all fixtures":
+        #     PROMPTECHO_MODE=all pytest
+        env_mode = os.environ.get("PROMPTECHO_MODE", "").strip()
+        self.mode = Mode(env_mode) if env_mode else Mode(mode)
         self.match_on = match_on
         self.on_record_error = on_record_error
 
@@ -115,6 +120,10 @@ def use_cassette(
 
         with promptecho.use_cassette("cassettes/foo.yaml", mode="none"):
             client.messages.create(...)
+
+    The ``PROMPTECHO_MODE`` environment variable, when set, overrides ``mode``
+    for every cassette in the process — e.g. ``PROMPTECHO_MODE=all pytest``
+    re-records an entire suite after a prompt change.
 
     ``on_record_error`` controls what happens when the upstream returns a
     non-2xx response that would otherwise be silently baked into the cassette

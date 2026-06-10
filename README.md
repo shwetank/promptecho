@@ -115,7 +115,12 @@ def test_bar(promptecho_cassette):   # records to cassettes/test_bar.yaml
     client.messages.create(...)
 ```
 
-The fixture defaults to `mode="once"` locally and `mode="none"` when `CI=true` — so a forgotten recording fails the build instead of making a live call.
+The fixture defaults to `mode="once"` locally and `mode="none"` when `CI=true` — so a forgotten recording fails the build instead of making a live call. Configure it per test with the marker:
+
+```python
+@pytest.mark.promptecho(match_on=["model", "messages", "temperature"], mode="new_episodes")
+def test_bar(promptecho_cassette): ...
+```
 
 ### Record modes
 Borrowed from vcrpy, so the mental model is free:
@@ -129,6 +134,12 @@ Borrowed from vcrpy, so the mental model is free:
 
 ```python
 @promptecho.use_cassette("cassettes/foo.yaml", mode="none")
+```
+
+Prompts changed and a pile of cassettes went stale? Re-record the whole suite without touching code — the env var overrides every cassette's mode:
+
+```bash
+PROMPTECHO_MODE=all pytest
 ```
 
 ### Choosing what to match on
