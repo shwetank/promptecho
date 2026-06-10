@@ -86,15 +86,15 @@ Detection falls back to body shape when the host is unknown, so localhost gatewa
 ## Install
 
 ```bash
-pip install promptecho   # not yet on PyPI — install from source for now
+pip install promptecho
 ```
+
+Requires Python ≥ 3.9 and `httpx ≥ 0.24`. To work on promptecho itself:
 
 ```bash
-git clone <repo> && cd promptecho
-pip install -e .
+git clone https://github.com/shwetank/promptecho && cd promptecho
+pip install -e ".[dev]" && pytest
 ```
-
-Requires Python ≥ 3.9 and `httpx ≥ 0.24`.
 
 ---
 
@@ -202,9 +202,9 @@ See [`examples/cassettes/example.yaml`](examples/cassettes/example.yaml) for a r
 
 ## Status
 
-**v0.1.0, working core. 19 tests, all green.** Not yet on PyPI.
+**Pre-1.0, working core** — on [PyPI](https://pypi.org/project/promptecho/), CI-tested on Python 3.9–3.13 (see badge for the current state; [CHANGELOG](CHANGELOG.md) for what's changed).
 
-Records and replays real httpx traffic — sync, async, SSE streaming, binary responses, cross-provider request shapes — verified end-to-end against a local server that gets shut down between record and replay.
+Records and replays real httpx traffic — sync, async, SSE streaming, binary responses, cross-provider request shapes — verified end-to-end against a local server that gets shut down between record and replay. Pre-1.0 means the API can still change; breaking changes are flagged in the changelog.
 
 ### Roadmap (build-in-public)
 
@@ -217,6 +217,9 @@ Done:
 - [x] Binary response round-trip (image/audio/octet-stream — base64 in cassette)
 - [x] Field-level diff on cassette miss (CI `mode=none` errors pinpoint the changed path, not just the field name)
 - [x] `on_record_error` policy (`warn` / `raise` / `record`) — prevents silently baking transient 4xx/5xx into cassettes
+- [x] Cassette format v2 — method + URL path in the match key; non-JSON bodies keyed by raw-byte hash (no silent collisions)
+- [x] Secret-safe cassettes — header **and** URL query-string redaction
+- [x] `PROMPTECHO_MODE=all pytest` suite-wide re-record; `@pytest.mark.promptecho` fixture config
 
 Next:
 - [ ] `requests` / `urllib3` interception backend — unlocks boto3-Bedrock and HF `InferenceClient`
