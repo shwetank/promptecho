@@ -12,6 +12,7 @@ Public API:
 from __future__ import annotations
 
 import functools
+import inspect
 from contextlib import contextmanager
 
 from .cassette import Cassette, PromptechoRecordingWarning
@@ -78,6 +79,17 @@ class _UseCassette:
         return self._cm.__exit__(*exc)
 
     def __call__(self, func):
+        # An async function returns its coroutine immediately; a sync wrapper
+        # would exit (and unpatch httpx) before the coroutine ever runs, so the
+        # patch must be held open across the await.
+        if inspect.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                with _activate(self._load(), self.mode, self.on_record_error):
+                    return await func(*args, **kwargs)
+
+            return async_wrapper
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             with _activate(self._load(), self.mode, self.on_record_error):

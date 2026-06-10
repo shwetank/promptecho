@@ -122,6 +122,37 @@ def test_async_record_then_replay(server, tmp_path):
     assert HITS["n"] == 1  # replayed from cassette, async client, server dead
 
 
+def test_async_decorator_records_and_replays(server, tmp_path):
+    """Regression: decorating an `async def` must keep the patch active across
+    the await. A sync wrapper exits (and unpatches httpx) as soon as the
+    coroutine is created, so nothing was recorded and every run hit the
+    network live — even in mode='none'.
+    """
+    srv, base = server
+    cassette = str(tmp_path / "async_dec.yaml")
+    body = {"model": "claude-opus-4-8", "messages": [{"role": "user", "content": "hi"}]}
+
+    @promptecho.use_cassette(cassette, mode="once")
+    async def call():
+        async with httpx.AsyncClient() as c:
+            r = await c.post(f"{base}/json", json=body)
+            return r.json()["content"][0]["text"]
+
+    assert asyncio.run(call()) == "A cat sat on a mat."
+    assert HITS["n"] == 1, "first run should record via one real call"
+
+    srv.shutdown()
+
+    @promptecho.use_cassette(cassette, mode="none")
+    async def replay():
+        async with httpx.AsyncClient() as c:
+            r = await c.post(f"{base}/json", json=body)
+            return r.json()["content"][0]["text"]
+
+    assert asyncio.run(replay()) == "A cat sat on a mat."
+    assert HITS["n"] == 1  # replayed from cassette, server dead, no live call
+
+
 def test_cross_shape_replay(server, tmp_path):
     """Record an Anthropic-shaped call; replay its OpenAI-shaped equivalent."""
     srv, base = server
